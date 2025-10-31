@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./pages/Raw_data_dashboard.css";
 
 @theme {
   --color-aqi-good: #00E400;
