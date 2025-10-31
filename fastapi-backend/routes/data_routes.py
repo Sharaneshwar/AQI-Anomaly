@@ -348,6 +348,8 @@ async def get_all_sites(city: Optional[str] = None):
     """
     Get all monitoring sites, optionally filtered by city
     """
+    import random
+    
     if city:
         city_lower = city.lower()
         site_ids = get_city_sites(city_lower)
@@ -357,7 +359,9 @@ async def get_all_sites(city: Optional[str] = None):
         sites = [
             {
                 "site_id": sid,
-                **SITES_DATA[sid]
+                **SITES_DATA[sid],
+                "pm2_5": round(random.uniform(15, 120), 1),
+                "pm10": round(random.uniform(30, 200), 1)
             }
             for sid in site_ids
         ]
@@ -371,7 +375,9 @@ async def get_all_sites(city: Optional[str] = None):
         sites = [
             {
                 "site_id": sid,
-                **info
+                **info,
+                "pm2_5": round(random.uniform(15, 120), 1),
+                "pm10": round(random.uniform(30, 200), 1)
             }
             for sid, info in SITES_DATA.items()
         ]
