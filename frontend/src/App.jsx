@@ -5,7 +5,8 @@ import "./App.css";
 
 function App() {
   return (
-    <Router>
+   <>
+ 
       <nav className="nav">
         <ul>
           <li><Link to="/">Home</Link></li>
@@ -17,7 +18,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/aqi-info" element={<AQI_info />} />
       </Routes>
-    </Router>
+    
+   </>
   );
 }
 
