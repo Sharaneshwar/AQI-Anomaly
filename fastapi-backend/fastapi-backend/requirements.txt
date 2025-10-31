@@ -1,0 +1,18 @@
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+motor==3.3.2
+pymongo==4.6.1
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+aiohttp==3.9.1
+python-multipart==0.0.6
+
+# For ML models - using compatible versions for Python 3.13
+# numpy==1.26.4
+# pandas==2.2.0
+# scikit-learn==1.4.0
+
+# Optional: Only install if you need deep learning
+# tensorflow==2.16.1
+# torch==2.2.0
