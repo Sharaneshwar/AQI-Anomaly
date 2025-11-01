@@ -1,12 +1,36 @@
-/* Navigation Styles */
+/* AtmosIQ Theme - Navigation */
 .nav {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 0;
-  margin: 0;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  background: #132D46;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  border-bottom: 2px solid #01C38D;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+
+.nav-title {
+  font-family: 'TT Commons', sans-serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: #FFFFFF;
+  letter-spacing: 0.5px;
 }
 
 .nav ul {
@@ -14,8 +38,8 @@
   margin: 0;
   padding: 0;
   display: flex;
-  justify-content: center;
-  gap: 0;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .nav li {
@@ -25,36 +49,65 @@
 
 .nav a {
   display: block;
-  color: white;
+  color: #FFFFFF;
   text-decoration: none;
-  padding: 1.25rem 2rem;
-  font-weight: 500;
-  font-size: 1rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
   transition: all 0.3s ease;
-  border-bottom: 3px solid transparent;
+  font-family: 'TT Commons', sans-serif;
+  font-weight: 400;
   position: relative;
 }
 
+.nav a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: #01C38D;
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+}
+
 .nav a:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-bottom-color: white;
+  color: #01C38D;
+  background: rgba(1, 195, 141, 0.1);
+}
+
+.nav a:hover::after {
+  width: 80%;
 }
 
 .nav a:active,
 .nav a.active {
-  background: rgba(255, 255, 255, 0.2);
-  border-bottom-color: white;
+  background: rgba(1, 195, 141, 0.2);
+  color: #01C38D;
 }
 
 /* Mobile responsive nav */
-@media (max-width: 640px) {
-  .nav ul {
+@media (max-width: 768px) {
+  .nav {
     flex-direction: column;
-  }
-  
-  .nav a {
     padding: 1rem;
-    text-align: center;
+    gap: 1rem;
+  }
+
+  .nav-brand {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .nav ul {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .nav a {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
   }
 }
 

@@ -1,14 +1,39 @@
 import React from "react";
 
 const AQI_info = () => {
+  const textStyle = {
+    fontFamily: "TT Commons, sans-serif",
+    fontWeight: "400",
+    color: "#FFFFFF",
+  };
+
+  const headingStyle = {
+    fontFamily: "TT Commons, sans-serif",
+    fontWeight: "600",
+    color: "#FFFFFF",
+  };
+
   return (
     <div className="dashboard-container p-4 md:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <header className="dashboard-header mb-6">
-        <h1 className="text-3xl md:text-4xl font-bold">
+        <h1
+          style={{
+            fontSize: "2rem",
+            fontFamily: "TT Commons, sans-serif",
+            fontWeight: "600",
+            color: "#FFFFFF",
+          }}
+        >
           ℹ️ Air Quality Index Information
         </h1>
-        <p className="text-white/90 mt-2">
+        <p
+          style={{
+            ...textStyle,
+            marginTop: "0.5rem",
+            fontSize: "1.1rem",
+          }}
+        >
           Understanding air pollution and its health impacts
         </p>
       </header>
@@ -19,12 +44,30 @@ const AQI_info = () => {
         <div className="space-y-3">
           <div
             className="flex items-center gap-4 p-4 rounded-lg"
-            style={{ backgroundColor: "#00E400" }}
+            style={{ backgroundColor: "#00E400", color: "#132D46" }}
           >
-            <div className="flex-shrink-0 w-24 text-center font-bold">0-50</div>
+            <div
+              className="shrink-0 w-24 text-center font-bold"
+              style={{
+                fontFamily: "TT Commons, sans-serif",
+                fontWeight: "600",
+              }}
+            >
+              0-50
+            </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-lg">Good</h3>
-              <p className="text-sm">
+              <h3
+                style={{
+                  ...headingStyle,
+                  fontSize: "1.125rem",
+                  color: "#132D46",
+                }}
+              >
+                Good
+              </h3>
+              <p
+                style={{ ...textStyle, fontSize: "0.875rem", color: "#132D46" }}
+              >
                 Air quality is satisfactory, and air pollution poses little or
                 no risk.
               </p>
@@ -33,14 +76,30 @@ const AQI_info = () => {
 
           <div
             className="flex items-center gap-4 p-4 rounded-lg"
-            style={{ backgroundColor: "#FFFF00" }}
+            style={{ backgroundColor: "#FFFF00", color: "#132D46" }}
           >
-            <div className="flex-shrink-0 w-24 text-center font-bold">
+            <div
+              className="shrink-0 w-24 text-center font-bold"
+              style={{
+                fontFamily: "TT Commons, sans-serif",
+                fontWeight: "600",
+              }}
+            >
               51-100
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-lg">Moderate</h3>
-              <p className="text-sm">
+              <h3
+                style={{
+                  ...headingStyle,
+                  fontSize: "1.125rem",
+                  color: "#132D46",
+                }}
+              >
+                Moderate
+              </h3>
+              <p
+                style={{ ...textStyle, fontSize: "0.875rem", color: "#132D46" }}
+              >
                 Air quality is acceptable. However, there may be a risk for some
                 people, particularly those who are unusually sensitive to air
                 pollution.
@@ -52,11 +111,17 @@ const AQI_info = () => {
             className="flex items-center gap-4 p-4 rounded-lg text-white"
             style={{ backgroundColor: "#FF7E00" }}
           >
-            <div className="flex-shrink-0 w-24 text-center font-bold">
+            <div
+              className="shrink-0 w-24 text-center font-bold"
+              style={{
+                fontFamily: "TT Commons, sans-serif",
+                fontWeight: "600",
+              }}
+            >
               101-200
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-lg">
+              <h3 style={{ ...headingStyle, fontSize: "1.125rem" }}>
                 Unhealthy for Sensitive Groups
               </h3>
               <p className="text-sm">

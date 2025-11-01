@@ -7,10 +7,25 @@ const Home = () => {
       {/* Hero Section */}
       <header className="dashboard-header mb-6">
         <div className="text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            🌍 Air Quality Monitoring System
+          <h1
+            style={{
+              fontSize: "2.5rem",
+              fontWeight: "600",
+              fontFamily: "TT Commons, sans-serif",
+              marginBottom: "1rem",
+              color: "#FFFFFF",
+            }}
+          >
+            🌍 AtmosIQ Air Quality Monitoring
           </h1>
-          <p className="text-lg md:text-xl text-white/90">
+          <p
+            style={{
+              fontSize: "1.25rem",
+              fontFamily: "TT Commons, sans-serif",
+              fontWeight: "400",
+              color: "#FFFFFF",
+            }}
+          >
             Real-time air quality data analysis across major Indian cities
           </p>
         </div>
@@ -21,13 +36,28 @@ const Home = () => {
         <Link
           to="/raw-data"
           className="dashboard-card hover:scale-105 transition-transform"
+          style={{ textDecoration: "none" }}
         >
           <div className="text-center">
             <div className="text-5xl mb-4">📊</div>
-            <h3 className="text-xl font-semibold mb-2 text-gray-800">
+            <h3
+              style={{
+                fontSize: "1.25rem",
+                fontWeight: "600",
+                fontFamily: "TT Commons, sans-serif",
+                marginBottom: "0.5rem",
+                color: "#FFFFFF",
+              }}
+            >
               Raw Data Dashboard
             </h3>
-            <p className="text-gray-600">
+            <p
+              style={{
+                color: "#696E79",
+                fontFamily: "TT Commons, sans-serif",
+                fontWeight: "400",
+              }}
+            >
               Interactive maps and charts showing PM2.5 and PM10 levels across
               monitoring sites
             </p>
@@ -37,13 +67,28 @@ const Home = () => {
         <Link
           to="/aqi-info"
           className="dashboard-card hover:scale-105 transition-transform"
+          style={{ textDecoration: "none" }}
         >
           <div className="text-center">
             <div className="text-5xl mb-4">ℹ️</div>
-            <h3 className="text-xl font-semibold mb-2 text-gray-800">
+            <h3
+              style={{
+                fontSize: "1.25rem",
+                fontWeight: "600",
+                fontFamily: "TT Commons, sans-serif",
+                marginBottom: "0.5rem",
+                color: "#FFFFFF",
+              }}
+            >
               AQI Information
             </h3>
-            <p className="text-gray-600">
+            <p
+              style={{
+                color: "#696E79",
+                fontFamily: "TT Commons, sans-serif",
+                fontWeight: "400",
+              }}
+            >
               Learn about Air Quality Index, pollutants, and health implications
             </p>
           </div>
@@ -52,10 +97,24 @@ const Home = () => {
         <div className="dashboard-card">
           <div className="text-center">
             <div className="text-5xl mb-4">🔮</div>
-            <h3 className="text-xl font-semibold mb-2 text-gray-800">
+            <h3
+              style={{
+                fontSize: "1.25rem",
+                fontWeight: "600",
+                fontFamily: "TT Commons, sans-serif",
+                marginBottom: "0.5rem",
+                color: "#FFFFFF",
+              }}
+            >
               ML Predictions
             </h3>
-            <p className="text-gray-600">
+            <p
+              style={{
+                color: "#696E79",
+                fontFamily: "TT Commons, sans-serif",
+                fontWeight: "400",
+              }}
+            >
               Coming soon: AI-powered air quality forecasting and trend analysis
             </p>
           </div>
@@ -85,11 +144,23 @@ const Home = () => {
       {/* About Section */}
       <div className="dashboard-card">
         <h2 className="card-header">About This Platform</h2>
-        <div className="space-y-4 text-gray-700">
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem",
+            color: "#FFFFFF",
+            fontFamily: "TT Commons, sans-serif",
+            fontWeight: "400",
+          }}
+        >
           <p>
             Our Air Quality Monitoring System provides comprehensive real-time
             data from monitoring stations across{" "}
-            <strong>Delhi, Mumbai, Bengaluru, Hyderabad, and Kolkata</strong>.
+            <strong style={{ color: "#01C38D" }}>
+              Delhi, Mumbai, Bengaluru, Hyderabad, and Kolkata
+            </strong>
+            .
           </p>
           <p>
             Track PM2.5 and PM10 particulate matter levels, visualize trends,
@@ -97,20 +168,68 @@ const Home = () => {
             dashboards and detailed analytics.
           </p>
           <div className="grid md:grid-cols-2 gap-4 mt-6">
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h3 className="font-semibold text-blue-900 mb-2">🎯 Features</h3>
-              <ul className="text-sm space-y-1 text-blue-800">
+            <div
+              style={{
+                padding: "1rem",
+                background: "#132D46",
+                borderRadius: "0.5rem",
+                border: "1px solid #01C38D",
+              }}
+            >
+              <h3
+                style={{
+                  fontWeight: "600",
+                  fontFamily: "TT Commons, sans-serif",
+                  color: "#01C38D",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                🎯 Features
+              </h3>
+              <ul
+                style={{
+                  fontSize: "0.875rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.25rem",
+                  color: "#FFFFFF",
+                  fontFamily: "TT Commons, sans-serif",
+                }}
+              >
                 <li>• Interactive city-wide maps</li>
                 <li>• Real-time pollution charts</li>
                 <li>• Historical data analysis</li>
                 <li>• Multiple monitoring sites</li>
               </ul>
             </div>
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <h3 className="font-semibold text-green-900 mb-2">
+            <div
+              style={{
+                padding: "1rem",
+                background: "#132D46",
+                borderRadius: "0.5rem",
+                border: "1px solid #01C38D",
+              }}
+            >
+              <h3
+                style={{
+                  fontWeight: "600",
+                  fontFamily: "TT Commons, sans-serif",
+                  color: "#01C38D",
+                  marginBottom: "0.5rem",
+                }}
+              >
                 📡 Data Sources
               </h3>
-              <ul className="text-sm space-y-1 text-green-800">
+              <ul
+                style={{
+                  fontSize: "0.875rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.25rem",
+                  color: "#FFFFFF",
+                  fontFamily: "TT Commons, sans-serif",
+                }}
+              >
                 <li>• CPCB monitoring stations</li>
                 <li>• State pollution boards</li>
                 <li>• 15-minute data intervals</li>
@@ -125,7 +244,26 @@ const Home = () => {
       <div className="mt-8 text-center">
         <Link
           to="/raw-data"
-          className="inline-block px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105"
+          style={{
+            display: "inline-block",
+            padding: "1rem 2rem",
+            background: "#01C38D",
+            color: "#132D46",
+            fontFamily: "TT Commons, sans-serif",
+            fontWeight: "600",
+            borderRadius: "0.5rem",
+            boxShadow: "0 4px 12px rgba(1, 195, 141, 0.3)",
+            textDecoration: "none",
+            transition: "all 0.3s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.transform = "scale(1.05)";
+            e.target.style.boxShadow = "0 6px 16px rgba(1, 195, 141, 0.5)";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = "scale(1)";
+            e.target.style.boxShadow = "0 4px 12px rgba(1, 195, 141, 0.3)";
+          }}
         >
           🚀 Explore Dashboard Now
         </Link>

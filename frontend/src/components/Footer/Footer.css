@@ -1,0 +1,168 @@
+/* AtmosIQ Theme - Footer */
+.footer {
+  background: #132D46;
+  color: #FFFFFF;
+  margin-top: auto;
+  padding: 3rem 2rem 1rem;
+  box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.2);
+  border-top: 2px solid #01C38D;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.footer-section h3,
+.footer-section h4 {
+  margin: 0 0 1rem 0;
+}
+
+.footer-brand {
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-family: 'TT Commons', sans-serif;
+  color: #FFFFFF;
+  margin-bottom: 0.5rem;
+}
+
+.footer-heading {
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: 'TT Commons', sans-serif;
+  color: #FFFFFF;
+  border-bottom: 2px solid #01C38D;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.footer-description,
+.footer-text {
+  color: #FFFFFF;
+  font-family: 'TT Commons', sans-serif;
+  font-weight: 400;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0.5rem 0;
+}
+
+.footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-links li {
+  margin: 0.5rem 0;
+}
+
+.footer-links a {
+  color: #FFFFFF;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  display: inline-block;
+  position: relative;
+  padding-left: 1rem;
+  font-family: 'TT Commons', sans-serif;
+  font-weight: 400;
+}
+
+.footer-links a::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: #01C38D;
+  transition: transform 0.3s ease;
+}
+
+.footer-links a:hover {
+  color: #01C38D;
+  transform: translateX(5px);
+}
+
+.footer-links a:hover::before {
+  transform: translateX(5px);
+}
+
+.team-name {
+  font-size: 1.3rem;
+  font-weight: 600;
+  font-family: 'TT Commons', sans-serif;
+  color: #01C38D;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  margin: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.footer-bottom {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid #01C38D;
+  text-align: center;
+}
+
+.footer-copyright {
+  color: #FFFFFF;
+  font-family: 'TT Commons', sans-serif;
+  font-weight: 400;
+  font-size: 0.9rem;
+  margin: 0.5rem 0;
+}
+
+.footer-copyright strong {
+  font-weight: 600;
+  color: #01C38D;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.footer-tagline {
+  color: #696E79;
+  font-family: 'TT Commons', sans-serif;
+  font-weight: 400;
+  font-size: 0.85rem;
+  font-style: italic;
+  margin: 0.5rem 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .footer {
+    padding: 2rem 1rem 1rem;
+  }
+
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .footer-brand {
+    font-size: 1.3rem;
+  }
+
+  .team-name {
+    font-size: 1.2rem;
+  }
+}
+
+/* Animation for footer entrance */
+.footer {
+  animation: slideInFromBottom 0.5s ease-out;
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

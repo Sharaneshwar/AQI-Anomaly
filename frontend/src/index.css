@@ -1,7 +1,28 @@
 @import "tailwindcss";
 @import "./pages/Raw_data_dashboard.css";
 
+/* TT Commons Font - Using system fallbacks */
+@font-face {
+  font-family: 'TT Commons';
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'TT Commons';
+  font-weight: 600;
+  font-style: normal;
+}
+
 @theme {
+  /* AtmosIQ Color Palette */
+  --color-dark-bg: #191E29;
+  --color-navy: #132D46;
+  --color-teal: #01C38D;
+  --color-gray: #696E79;
+  --color-white: #FFFFFF;
+  
+  /* AQI Colors */
   --color-aqi-good: #00E400;
   --color-aqi-moderate: #FFFF00;
   --color-aqi-unhealthy-sensitive: #FF7E00;
@@ -31,7 +52,7 @@
 }
 
 :root {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'TT Commons', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   
@@ -45,8 +66,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #f8fafc;
-  color: #1e293b;
+  background-color: #191E29;
+  color: #FFFFFF;
 }
 
 /* Custom scrollbar */
@@ -56,14 +77,14 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #132D46;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #01C38D;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #00a876;
 }

@@ -317,7 +317,13 @@ export default function RawDataDashboard() {
                 ) : citiesError ? (
                   <div className="error-message">Error: {citiesError}</div>
                 ) : !citiesData ? (
-                  <div className="text-sm text-gray-500">
+                  <div
+                    style={{
+                      fontSize: "0.875rem",
+                      color: "#696E79",
+                      fontFamily: "TT Commons, sans-serif",
+                    }}
+                  >
                     No city data available.
                   </div>
                 ) : (
@@ -338,7 +344,14 @@ export default function RawDataDashboard() {
                           </div>
                         </div>
                       </div>
-                      <div className="text-sm text-gray-500 italic">
+                      <div
+                        style={{
+                          fontSize: "0.875rem",
+                          color: "#696E79",
+                          fontStyle: "italic",
+                          fontFamily: "TT Commons, sans-serif",
+                        }}
+                      >
                         💡 Click city circles to focus, markers for details
                       </div>
                     </div>
@@ -377,14 +390,39 @@ export default function RawDataDashboard() {
                             }}
                           >
                             <Popup>
-                              <div className="text-sm">
-                                <div className="font-semibold text-base">
+                              <div
+                                style={{
+                                  fontSize: "0.875rem",
+                                  color: "#132D46",
+                                  fontFamily: "TT Commons, sans-serif",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontWeight: "600",
+                                    fontSize: "1rem",
+                                    color: "#132D46",
+                                  }}
+                                >
                                   {c.city}
                                 </div>
-                                <div className="text-xs text-gray-600 mt-1">
+                                <div
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    color: "#696E79",
+                                    marginTop: "0.25rem",
+                                  }}
+                                >
                                   📍 {c.sites_count} monitoring sites
                                 </div>
-                                <div className="text-xs mt-2 text-indigo-600">
+                                <div
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    marginTop: "0.5rem",
+                                    color: "#01C38D",
+                                    fontWeight: "600",
+                                  }}
+                                >
                                   Click to focus map
                                 </div>
                               </div>
@@ -400,12 +438,37 @@ export default function RawDataDashboard() {
                             title={`${s.name}`}
                           >
                             <Popup>
-                              <div className="text-sm">
-                                <div className="font-semibold">{s.name}</div>
-                                <div className="text-xs text-gray-600 mt-1">
+                              <div
+                                style={{
+                                  fontSize: "0.875rem",
+                                  color: "#132D46",
+                                  fontFamily: "TT Commons, sans-serif",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontWeight: "600",
+                                    color: "#132D46",
+                                  }}
+                                >
+                                  {s.name}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    color: "#696E79",
+                                    marginTop: "0.25rem",
+                                  }}
+                                >
                                   📍 {s.city}
                                 </div>
-                                <div className="text-xs text-gray-500 mt-2">
+                                <div
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    color: "#696E79",
+                                    marginTop: "0.5rem",
+                                  }}
+                                >
                                   Lat: {s.lat?.toFixed(5)}, Lon:{" "}
                                   {s.lon?.toFixed(5)}
                                 </div>
@@ -423,7 +486,13 @@ export default function RawDataDashboard() {
                 <h2 className="card-header">Site Data Analysis</h2>
 
                 {/* Data Source Toggle and Date Pickers */}
-                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div
+                  className="mb-4 p-4 rounded-lg"
+                  style={{
+                    background: "#132D46",
+                    border: "1px solid #01C38D",
+                  }}
+                >
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -431,9 +500,20 @@ export default function RawDataDashboard() {
                           type="checkbox"
                           checked={useRealData}
                           onChange={(e) => setUseRealData(e.target.checked)}
-                          className="w-4 h-4 text-blue-600 rounded"
+                          style={{
+                            width: "1rem",
+                            height: "1rem",
+                            accentColor: "#01C38D",
+                          }}
                         />
-                        <span className="text-sm font-medium text-gray-700">
+                        <span
+                          style={{
+                            fontSize: "0.875rem",
+                            fontWeight: "500",
+                            color: "#FFFFFF",
+                            fontFamily: "TT Commons, sans-serif",
+                          }}
+                        >
                           {useRealData
                             ? "📡 Using Real API Data"
                             : "🎲 Using Mock Data"}
@@ -444,25 +524,59 @@ export default function RawDataDashboard() {
                     {useRealData && (
                       <div className="flex flex-col md:flex-row gap-3">
                         <div className="flex-1">
-                          <label className="text-xs text-gray-600 block mb-1">
+                          <label
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "#696E79",
+                              display: "block",
+                              marginBottom: "0.25rem",
+                              fontFamily: "TT Commons, sans-serif",
+                            }}
+                          >
                             Start Date & Time
                           </label>
                           <input
                             type="datetime-local"
                             value={startDate.replace("T", "T")}
                             onChange={(e) => setStartDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            style={{
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              border: "1px solid #01C38D",
+                              borderRadius: "0.375rem",
+                              fontSize: "0.875rem",
+                              background: "#191E29",
+                              color: "#FFFFFF",
+                              fontFamily: "TT Commons, sans-serif",
+                            }}
                           />
                         </div>
                         <div className="flex-1">
-                          <label className="text-xs text-gray-600 block mb-1">
+                          <label
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "#696E79",
+                              display: "block",
+                              marginBottom: "0.25rem",
+                              fontFamily: "TT Commons, sans-serif",
+                            }}
+                          >
                             End Date & Time
                           </label>
                           <input
                             type="datetime-local"
                             value={endDate.replace("T", "T")}
                             onChange={(e) => setEndDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            style={{
+                              width: "100%",
+                              padding: "0.5rem 0.75rem",
+                              border: "1px solid #01C38D",
+                              borderRadius: "0.375rem",
+                              fontSize: "0.875rem",
+                              background: "#191E29",
+                              color: "#FFFFFF",
+                              fontFamily: "TT Commons, sans-serif",
+                            }}
                           />
                         </div>
                       </div>
@@ -472,7 +586,14 @@ export default function RawDataDashboard() {
 
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                   <div className="flex items-center gap-3">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label
+                      style={{
+                        fontSize: "0.875rem",
+                        fontWeight: "500",
+                        color: "#FFFFFF",
+                        fontFamily: "TT Commons, sans-serif",
+                      }}
+                    >
                       Select City:
                     </label>
                     <select
@@ -492,13 +613,13 @@ export default function RawDataDashboard() {
                   <div className="flex gap-3">
                     <div className="stat-card">
                       <div className="stat-label">Avg PM2.5</div>
-                      <div className="stat-value text-red-600">
+                      <div className="stat-value" style={{ color: "#01C38D" }}>
                         {averages.pm2_5 ?? "-"}
                       </div>
                     </div>
                     <div className="stat-card">
                       <div className="stat-label">Avg PM10</div>
-                      <div className="stat-value text-blue-600">
+                      <div className="stat-value" style={{ color: "#01C38D" }}>
                         {averages.pm10 ?? "-"}
                       </div>
                     </div>
@@ -514,7 +635,15 @@ export default function RawDataDashboard() {
                   ) : sitesError ? (
                     <div className="error-message">Error: {sitesError}</div>
                   ) : !sitesData?.sites || !sitesData.sites.length ? (
-                    <div className="text-sm text-gray-500 text-center py-8">
+                    <div
+                      style={{
+                        fontSize: "0.875rem",
+                        color: "#696E79",
+                        textAlign: "center",
+                        padding: "2rem 0",
+                        fontFamily: "TT Commons, sans-serif",
+                      }}
+                    >
                       No site data available.
                     </div>
                   ) : (
@@ -526,7 +655,8 @@ export default function RawDataDashboard() {
                         >
                           <CartesianGrid
                             strokeDasharray="3 3"
-                            stroke="#e2e8f0"
+                            stroke="#01C38D"
+                            opacity={0.2}
                           />
                           <XAxis
                             dataKey="name"
@@ -534,30 +664,45 @@ export default function RawDataDashboard() {
                             textAnchor="end"
                             interval={0}
                             height={80}
-                            tick={{ fill: "#64748b", fontSize: 12 }}
+                            tick={{
+                              fill: "#FFFFFF",
+                              fontSize: 12,
+                              fontFamily: "TT Commons, sans-serif",
+                            }}
                           />
-                          <YAxis tick={{ fill: "#64748b", fontSize: 12 }} />
+                          <YAxis
+                            tick={{
+                              fill: "#FFFFFF",
+                              fontSize: 12,
+                              fontFamily: "TT Commons, sans-serif",
+                            }}
+                          />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "white",
-                              border: "1px solid #e2e8f0",
+                              backgroundColor: "#132D46",
+                              border: "1px solid #01C38D",
                               borderRadius: "0.5rem",
-                              boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+                              boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
+                              color: "#FFFFFF",
+                              fontFamily: "TT Commons, sans-serif",
                             }}
                           />
                           <Legend
-                            wrapperStyle={{ paddingTop: "1rem" }}
+                            wrapperStyle={{
+                              paddingTop: "1rem",
+                              color: "#FFFFFF",
+                            }}
                             iconType="circle"
                           />
                           <Bar
                             dataKey="pm2_5"
-                            fill="#ef4444"
+                            fill="#FF7E00"
                             name="PM2.5 (µg/m³)"
                             radius={[4, 4, 0, 0]}
                           />
                           <Bar
                             dataKey="pm10"
-                            fill="#3b82f6"
+                            fill="#01C38D"
                             name="PM10 (µg/m³)"
                             radius={[4, 4, 0, 0]}
                           />
@@ -594,13 +739,30 @@ export default function RawDataDashboard() {
                 </div>
                 <div className="summary-item">
                   <span className="font-medium">Data source:</span>{" "}
-                  <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                  <code
+                    style={{
+                      fontSize: "0.75rem",
+                      background: "#191E29",
+                      padding: "0.25rem 0.5rem",
+                      borderRadius: "0.25rem",
+                      color: "#01C38D",
+                      fontFamily: "monospace",
+                    }}
+                  >
                     /cities
                   </code>
                 </div>
               </div>
             ) : (
-              <div className="text-sm text-gray-500">No data</div>
+              <div
+                style={{
+                  fontSize: "0.875rem",
+                  color: "#696E79",
+                  fontFamily: "TT Commons, sans-serif",
+                }}
+              >
+                No data
+              </div>
             )}
           </div>
 
@@ -614,7 +776,15 @@ export default function RawDataDashboard() {
             ) : citiesError ? (
               <div className="error-message">Error: {citiesError}</div>
             ) : !citiesData?.cities?.length ? (
-              <div className="text-sm text-gray-500">No cities</div>
+              <div
+                style={{
+                  fontSize: "0.875rem",
+                  color: "#696E79",
+                  fontFamily: "TT Commons, sans-serif",
+                }}
+              >
+                No cities
+              </div>
             ) : (
               <ul className="city-list space-y-2">
                 {citiesData.cities.map((c) => (
