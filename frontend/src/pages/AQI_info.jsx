@@ -186,7 +186,7 @@ const AQI_info = () => {
       <div className="grid md:grid-cols-2 gap-6 mb-6">
         <div className="dashboard-card">
           <h2 className="card-header">PM2.5 Particulate Matter</h2>
-          <div className="space-y-4 text-gray-700">
+          <div className="space-y-4 text-white-700">
             <div>
               <h3 className="font-semibold text-lg mb-2">What is PM2.5?</h3>
               <p className="text-sm">
@@ -218,7 +218,7 @@ const AQI_info = () => {
 
         <div className="dashboard-card">
           <h2 className="card-header">PM10 Particulate Matter</h2>
-          <div className="space-y-4 text-gray-700">
+          <div className="space-y-4 text-white-700">
             <div>
               <h3 className="font-semibold text-lg mb-2">What is PM10?</h3>
               <p className="text-sm">
@@ -257,7 +257,7 @@ const AQI_info = () => {
             <h3 className="font-semibold text-lg mb-3 text-green-700">
               Good Days (0-100)
             </h3>
-            <ul className="text-sm space-y-2 text-gray-700">
+            <ul className="text-sm space-y-2 text-white-700">
               <li>✅ Outdoor activities are safe</li>
               <li>✅ Windows can be kept open</li>
               <li>✅ Normal outdoor exercise</li>
@@ -267,7 +267,7 @@ const AQI_info = () => {
             <h3 className="font-semibold text-lg mb-3 text-orange-700">
               Moderate Days (101-200)
             </h3>
-            <ul className="text-sm space-y-2 text-gray-700">
+            <ul className="text-sm space-y-2 text-white-700">
               <li>⚠️ Limit prolonged outdoor activities</li>
               <li>⚠️ Close windows during peak hours</li>
               <li>⚠️ Sensitive groups take precautions</li>
@@ -277,7 +277,7 @@ const AQI_info = () => {
             <h3 className="font-semibold text-lg mb-3 text-red-700">
               Unhealthy Days (200+)
             </h3>
-            <ul className="text-sm space-y-2 text-gray-700">
+            <ul className="text-sm space-y-2 text-white-700">
               <li>🚫 Avoid outdoor activities</li>
               <li>🚫 Use air purifiers indoors</li>
               <li>🚫 Wear N95 masks if going out</li>
