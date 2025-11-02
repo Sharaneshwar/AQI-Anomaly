@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { API_BASE_URL } from "../config";
 
 
 const Home = () => {
@@ -12,7 +13,7 @@ const [sitesData, setSitesData] = useState([]);
 useEffect(() => {
   async function loadCities() {
     try {
-      const res = await fetch("/cities");
+      const res = await fetch(`${API_BASE_URL}/cities`);
       const json = await res.json();
       setCitiesData(json.cities || []);
       setSelectedCity(json.cities?.[0]?.city || null);
@@ -28,7 +29,9 @@ useEffect(() => {
   if (!selectedCity) return;
   async function loadSites() {
     try {
-      const res = await fetch(`/sites?city=${encodeURIComponent(selectedCity)}`);
+      const res = await fetch(
+        `${API_BASE_URL}/sites?city=${encodeURIComponent(selectedCity)}`
+      );
       const json = await res.json();
       setSitesData(json.sites || []);
     } catch (err) {
