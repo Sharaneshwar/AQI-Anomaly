@@ -57,6 +57,7 @@ app.add_middleware(
 app.include_router(data_routes.router, prefix="/api", tags=["Data"])
 app.include_router(ml_routes.router, prefix="/api/ml", tags=["ML Models"])
 
+
 @app.get("/")
 async def root():
     """Root endpoint"""

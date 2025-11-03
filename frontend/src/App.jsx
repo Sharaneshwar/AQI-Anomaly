@@ -5,6 +5,7 @@ import AQI_info from "./pages/AQI_info";
 import AqiDashboard from "./pages/Raw_data_dashboard"; // adjust path if needed
 import Footer from "./components/Footer/Footer";
 import "./App.css";
+import Anomaly from "./pages/Anomaly";
 
 function App() {
   return (
@@ -26,6 +27,9 @@ function App() {
           <li>
             <Link to="/raw-data">Raw Data Dashboard</Link>
           </li>
+          <li>
+            <Link to="/anomaly">Anomaly</Link>
+          </li>
         </ul>
       </nav>
 
@@ -34,6 +38,8 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/aqi-info" element={<AQI_info />} />
           <Route path="/raw-data" element={<AqiDashboard />} />
+          <Route path="/anomaly" element={<Anomaly />} />
+
         </Routes>
       </main>
 
