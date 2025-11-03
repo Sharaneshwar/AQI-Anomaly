@@ -22,6 +22,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import { API_BASE_URL } from "../config";
 
 /*
 File: Raw_data_dashboard.jsx
@@ -85,7 +86,7 @@ export default function RawDataDashboard() {
       setCitiesLoading(true);
       setCitiesError(null);
       try {
-        const res = await fetch("/cities");
+        const res = await fetch(`${API_BASE_URL}/cities`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (mounted) {
@@ -122,7 +123,7 @@ export default function RawDataDashboard() {
         let url;
         if (useRealData) {
           // Fetch REAL data from /api/city-data
-          url = `/api/city-data?city=${encodeURIComponent(
+          url = `${API_BASE_URL}/city-data?city=${encodeURIComponent(
             selectedCity
           )}&start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(
             endDate
@@ -130,7 +131,9 @@ export default function RawDataDashboard() {
           console.log("Fetching REAL city data from:", url);
         } else {
           // Fetch MOCK data from /sites
-          url = `/sites?city=${encodeURIComponent(selectedCity)}`;
+          url = `${API_BASE_URL}/sites?city=${encodeURIComponent(
+            selectedCity
+          )}`;
           console.log("Fetching MOCK sites data from:", url);
         }
 

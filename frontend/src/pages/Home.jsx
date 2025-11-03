@@ -1,42 +1,43 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-
+import { API_BASE_URL } from "../config";
 
 const Home = () => {
-
   const [citiesData, setCitiesData] = useState([]);
-const [selectedCity, setSelectedCity] = useState(null);
-const [sitesData, setSitesData] = useState([]);
+  const [selectedCity, setSelectedCity] = useState(null);
+  const [sitesData, setSitesData] = useState([]);
 
-// Fetch cities from backend
-useEffect(() => {
-  async function loadCities() {
-    try {
-      const res = await fetch("/cities");
-      const json = await res.json();
-      setCitiesData(json.cities || []);
-      setSelectedCity(json.cities?.[0]?.city || null);
-    } catch (err) {
-      console.error("Error loading cities:", err);
+  // Fetch cities from backend
+  useEffect(() => {
+    async function loadCities() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/cities`);
+        const json = await res.json();
+        setCitiesData(json.cities || []);
+        setSelectedCity(json.cities?.[0]?.city || null);
+      } catch (err) {
+        console.error("Error loading cities:", err);
+      }
     }
-  }
-  loadCities();
-}, []);
+    loadCities();
+  }, []);
 
-// Fetch sites for the selected city
-useEffect(() => {
-  if (!selectedCity) return;
-  async function loadSites() {
-    try {
-      const res = await fetch(`/sites?city=${encodeURIComponent(selectedCity)}`);
-      const json = await res.json();
-      setSitesData(json.sites || []);
-    } catch (err) {
-      console.error("Error loading sites:", err);
+  // Fetch sites for the selected city
+  useEffect(() => {
+    if (!selectedCity) return;
+    async function loadSites() {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/sites?city=${encodeURIComponent(selectedCity)}`
+        );
+        const json = await res.json();
+        setSitesData(json.sites || []);
+      } catch (err) {
+        console.error("Error loading sites:", err);
+      }
     }
-  }
-  loadSites();
-}, [selectedCity]);
+    loadSites();
+  }, [selectedCity]);
   return (
     <div className="dashboard-container p-4 md:p-6 max-w-7xl mx-auto">
       {/* Hero Section */}
@@ -65,115 +66,117 @@ useEffect(() => {
           </p>
         </div>
       </header>
-{/* fasafs
+      {/* fasafs
 
 
 TEST CODE starts
 
 */}
 
-{/* City and Site Selector Section */}
-<div
-  className="dashboard-card mb-8"
-  style={{
-    display: "flex",
-    flexDirection: "row",
-    gap: "2rem",
-    background: "#132D46",
-    padding: "1.5rem",
-    borderRadius: "0.5rem",
-    border: "1px solid #01C38D",
-  }}
->
-  {/* Left - City List */}
-  <div style={{ flex: 1 }}>
-    <h3
-      style={{
-        color: "#01C38D",
-        fontFamily: "TT Commons, sans-serif",
-        fontWeight: "600",
-        marginBottom: "0.75rem",
-      }}
-    >
-      🏙️ Select a City
-    </h3>
-    <ul style={{ listStyle: "none", padding: 0 }}>
-      {citiesData.map((city) => (
-        <li
-          key={city.city}
-          onClick={() => setSelectedCity(city.city)}
-          style={{
-            padding: "0.75rem 1rem",
-            marginBottom: "0.5rem",
-            background:
-              selectedCity === city.city ? "#01C38D" : "transparent",
-            color: selectedCity === city.city ? "#132D46" : "#FFFFFF",
-            borderRadius: "0.5rem",
-            cursor: "pointer",
-            fontFamily: "TT Commons, sans-serif",
-            fontWeight: "500",
-            transition: "all 0.2s ease",
-          }}
-        >
-          {city.city} ({city.sites_count || city.sites?.length || 0})
-        </li>
-      ))}
-    </ul>
-  </div>
-
-  {/* Right - Site List */}
-  <div style={{ flex: 2 }}>
-    <h3
-      style={{
-        color: "#01C38D",
-        fontFamily: "TT Commons, sans-serif",
-        fontWeight: "600",
-        marginBottom: "0.75rem",
-      }}
-    >
-      📍 Monitoring Sites in {selectedCity || "—"}
-    </h3>
-
-    {sitesData.length === 0 ? (
-      <p style={{ color: "#FFFFFF", fontFamily: "TT Commons, sans-serif" }}>
-        No sites available for this city.
-      </p>
-    ) : (
-      <ul
+      {/* City and Site Selector Section */}
+      <div
+        className="dashboard-card mb-8"
         style={{
-          listStyle: "none",
-          padding: 0,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-          gap: "0.75rem",
+          display: "flex",
+          flexDirection: "row",
+          gap: "2rem",
+          background: "#132D46",
+          padding: "1.5rem",
+          borderRadius: "0.5rem",
+          border: "1px solid #01C38D",
         }}
       >
-        {sitesData.map((site) => (
-          <li
-            key={site.name}
+        {/* Left - City List */}
+        <div style={{ flex: 1 }}>
+          <h3
             style={{
-              background: "#0B1D31",
-              color: "#FFFFFF",
-              border: "1px solid #01C38D",
-              padding: "0.75rem",
-              borderRadius: "0.5rem",
+              color: "#01C38D",
               fontFamily: "TT Commons, sans-serif",
-              fontSize: "0.9rem",
+              fontWeight: "600",
+              marginBottom: "0.75rem",
             }}
           >
-            <strong>{site.name}</strong>
-            <br />
-            <span style={{ color: "#01C38D" }}>
-              PM2.5: {site.pm2_5 ?? "—"} | PM10: {site.pm10 ?? "—"}
-            </span>
-          </li>
-        ))}
-      </ul>
-    )}
-  </div>
-</div>
+            🏙️ Select a City
+          </h3>
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {citiesData.map((city) => (
+              <li
+                key={city.city}
+                onClick={() => setSelectedCity(city.city)}
+                style={{
+                  padding: "0.75rem 1rem",
+                  marginBottom: "0.5rem",
+                  background:
+                    selectedCity === city.city ? "#01C38D" : "transparent",
+                  color: selectedCity === city.city ? "#132D46" : "#FFFFFF",
+                  borderRadius: "0.5rem",
+                  cursor: "pointer",
+                  fontFamily: "TT Commons, sans-serif",
+                  fontWeight: "500",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {city.city} ({city.sites_count || city.sites?.length || 0})
+              </li>
+            ))}
+          </ul>
+        </div>
 
-{/*
+        {/* Right - Site List */}
+        <div style={{ flex: 2 }}>
+          <h3
+            style={{
+              color: "#01C38D",
+              fontFamily: "TT Commons, sans-serif",
+              fontWeight: "600",
+              marginBottom: "0.75rem",
+            }}
+          >
+            📍 Monitoring Sites in {selectedCity || "—"}
+          </h3>
+
+          {sitesData.length === 0 ? (
+            <p
+              style={{ color: "#FFFFFF", fontFamily: "TT Commons, sans-serif" }}
+            >
+              No sites available for this city.
+            </p>
+          ) : (
+            <ul
+              style={{
+                listStyle: "none",
+                padding: 0,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: "0.75rem",
+              }}
+            >
+              {sitesData.map((site) => (
+                <li
+                  key={site.name}
+                  style={{
+                    background: "#0B1D31",
+                    color: "#FFFFFF",
+                    border: "1px solid #01C38D",
+                    padding: "0.75rem",
+                    borderRadius: "0.5rem",
+                    fontFamily: "TT Commons, sans-serif",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  <strong>{site.name}</strong>
+                  <br />
+                  <span style={{ color: "#01C38D" }}>
+                    PM2.5: {site.pm2_5 ?? "—"} | PM10: {site.pm10 ?? "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/*
 
 
 TEST CODE ENDS
@@ -242,9 +245,13 @@ TEST CODE ENDS
           </div>
         </Link>
 
-        <div className="dashboard-card">
+        <Link
+          to="/anomaly"
+          className="dashboard-card hover:scale-105 transition-transform"
+          style={{ textDecoration: "none" }}
+        >
           <div className="text-center">
-            <div className="text-5xl mb-4">🔮</div>
+            <div className="text-5xl mb-4">�</div>
             <h3
               style={{
                 fontSize: "1.25rem",
@@ -254,7 +261,7 @@ TEST CODE ENDS
                 color: "#FFFFFF",
               }}
             >
-              ML Predictions
+              Anomaly Detection
             </h3>
             <p
               style={{
@@ -263,10 +270,10 @@ TEST CODE ENDS
                 fontWeight: "400",
               }}
             >
-              Coming soon: AI-powered air quality forecasting and trend analysis
+              AI-powered detection of unusual patterns in air quality data
             </p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Stats Section */}
