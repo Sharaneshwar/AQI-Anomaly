@@ -551,6 +551,7 @@ export default function RawDataDashboard() {
                               background: "#191E29",
                               color: "#FFFFFF",
                               fontFamily: "TT Commons, sans-serif",
+                              colorScheme: "dark",
                             }}
                           />
                         </div>
@@ -579,6 +580,7 @@ export default function RawDataDashboard() {
                               background: "#191E29",
                               color: "#FFFFFF",
                               fontFamily: "TT Commons, sans-serif",
+                              colorScheme: "dark",
                             }}
                           />
                         </div>
