@@ -1,16 +1,80 @@
-# React + Vite
+# AtmosIQ Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite SPA. Deployed on Vercel at **`https://atmos-iq.vercel.app`**.
+Calls the FastAPI backend at **`https://aqi-anomaly.onrender.com`**.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+cd AQI-Anomaly/frontend
+npm install
+npm run dev                 # http://localhost:5173 → connects to http://localhost:8000
+```
 
-## React Compiler
+No env file needed for local dev — `src/config.js` defaults to
+`http://localhost:8000`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Routes
 
-## Expanding the ESLint configuration
+| Path | Component | Backend it hits |
+|---|---|---|
+| `/`            | `Home`      | `/api/cities`, `/api/sites`, `/api/aqi/sites`, `/api/aqi/anomalies` (live Kolkata snapshot) |
+| `/raw-data`    | `Dashboard` | `/api/cities`, `/api/sites`, `/api/city-data` (Respirer proxy) |
+| `/anomaly`     | `Anomaly`   | `/api/aqi/sites`, `/api/aqi/anomalies` (Postgres-backed) |
+| `/aqi-info`    | `AqiInfo`   | static AQI reference |
+| `/chat`        | `Chat`      | `/api/chat/{conversations,sessions,stream}` (SSE) |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Stack
+
+- **React 19 + Vite 7 + Tailwind v4** with CSS variables.
+- **shadcn/ui** components under `src/components/ui/` (Button, Card, Input,
+  Textarea, Select, Tabs, Badge, ScrollArea, Avatar, Skeleton, Tooltip, Sheet,
+  DropdownMenu, Sonner toasts).
+- **Lucide React** icons, **Recharts** for time-series, **Leaflet** + dark
+  CartoCDN tiles for the map. **Chart.js** is used by the in-chat
+  `[[CHART:name]]` renderer.
+- Theme tokens live in `src/index.css` (oklch values tinted to AtmosIQ palette
+  `#191E29` / `#132D46` / `#01C38D`). Always-dark — no light-mode toggle.
+
+## Configuration
+
+`src/config.js` reads `VITE_BACKEND_URL` and exports `API_BASE_URL`. If unset,
+falls back to `http://localhost:8000` for local dev.
+
+Set on Vercel:
+- Project settings → Environment Variables → `VITE_BACKEND_URL` =
+  `https://aqi-anomaly.onrender.com` (production).
+- Add for preview environments too if you want preview URLs to hit prod (or a
+  staging backend).
+
+## Deployment (Vercel)
+
+Connected to the `AQI-Anomaly` GitHub repo with `frontend` as the root
+directory. Push to `main` → Vercel auto-deploys. Preview URLs follow the
+`atmos-iq-*.vercel.app` pattern; backend CORS already whitelists those.
+
+## Chat page
+
+ChatGPT/Claude-style layout with a left sidebar listing past sessions
+(grouped by Today / Yesterday / Last 7 days / Last 30 days / Older), a main
+message pane with an animated thinking indicator and copy-on-hover, and an
+auto-resize composer.
+
+| File | Purpose |
+|---|---|
+| `src/pages/Chat.jsx` | sidebar + welcome + composer + SSE wiring |
+| `src/components/chat/Message.jsx` | bubble body + tool accordion + token embed |
+| `src/components/chat/ChatTable.jsx` | renders `[[TABLE:name]]` tokens |
+| `src/components/chat/ChatChart.jsx` | renders `[[CHART:name]]` tokens via Chart.js |
+| `src/components/chat/chatUtils.js` | markdown rendering + token parsing |
+
+Hits these backend endpoints:
+- `POST /api/chat/conversations` — create a fresh session
+- `GET /api/chat/sessions` — sidebar list
+- `GET /api/chat/sessions/{id}` — replay full transcript when user reopens
+- `GET /api/chat/stream?session_id=&prompt=` — SSE
+- `DELETE /api/chat/conversations/{id}` — cascade delete
+
+Backend SSE event names handled: `trace_started`, `run_started`, `iteration`,
+`tool_start`, `tool_end`, `table`, `text_delta`, `run_completed`,
+`agent_error`.
