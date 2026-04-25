@@ -1,0 +1,53 @@
+# Render IaC for the AQI-Anomaly backend.
+#
+# Connect the AQI-Anomaly GitHub repo to Render and point at this file.
+# Build is a plain `pip install -r requirements.txt` — no submodules,
+# no clones, no model downloads (the backend is fully self-contained).
+#
+# Set the env vars marked `sync: false` once in Render's dashboard.
+
+services:
+  - type: web
+    name: aqi-anomaly
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+
+    envVars:
+      # Postgres (Supabase)
+      - key: AQ_DB_URL
+        sync: false
+      - key: AQ_DB_URL_POOL
+        sync: false
+
+      # Token-gates POST /api/admin/*
+      - key: ADMIN_TOKEN
+        sync: false
+
+      # AQI Agent — LLM provider.
+      # Default: Gemini 2.5 Flash via Google AI Studio.
+      # Swap to Groq with `groq:llama-3.3-70b-versatile` (set GROQ_API_KEY too).
+      - key: AQI_AGENT_MODEL
+        value: google-gla:gemini-2.5-flash
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+      # AQI Agent — tool keys (optional; tool registers only if its key is set)
+      - key: AQICN_API_TOKEN
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+
+      # AQI Agent — Langfuse observability (optional)
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+      - key: LANGFUSE_HOST
+        sync: false

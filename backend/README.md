@@ -17,6 +17,7 @@ backend/
 │   └── chat_routes.py   # /api/chat/{conversations,stream}   (SSE → aqi_agent)
 ├── aqi_agent/           # pydantic-ai agent + tools (Postgres, AQICN, Tavily)
 ├── requirements.txt
+├── render.yaml          # Render IaC
 └── .env                 # local secrets (gitignored)
 ```
 
@@ -72,11 +73,12 @@ curl 'http://localhost:8000/api/aqi/history?site_id=site_296&limit=5'
 
 ## Deployment (Render)
 
-The service runs at `https://aqi-anomaly.onrender.com`. Render auto-deploys
-on push to the connected branch. Build is a plain `pip install -r
-requirements.txt`; start command is
-`uvicorn main:app --host 0.0.0.0 --port $PORT`. No submodules, no clones, no
-model downloads — the backend is fully self-contained.
+The service runs at `https://aqi-anomaly.onrender.com`. The deploy config is
+declared in [`render.yaml`](./render.yaml) — point Render at this file and it
+will read `rootDir`, `buildCommand`, `startCommand`, and the list of
+expected env vars. Build is a plain `pip install -r requirements.txt`; start
+command is `uvicorn main:app --host 0.0.0.0 --port $PORT`. No submodules, no
+clones, no model downloads — the backend is fully self-contained.
 
 Required env vars (set in Render's dashboard):
 
