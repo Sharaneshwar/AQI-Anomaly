@@ -25,5 +25,9 @@ dist-ssr
 *.sln
 *.sw?
 .env
+backend/scripts
+backend/Schema.md
 # Added by code-review-graph
 .code-review-graph/
+.claude
+.mcp.json

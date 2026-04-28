@@ -85,6 +85,12 @@ export default function Chat() {
   const [streaming, setStreaming] = useState(false);
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const esRef = useRef(null);
+  // SSE coalescer: text_delta fires per token. We buffer into a ref and
+  // flush via requestAnimationFrame so React commits at ~60fps regardless
+  // of event frequency, instead of once per delta (which re-parses
+  // markdown each time).
+  const streamBufRef = useRef(null);
+  const rafRef = useRef(0);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -104,16 +110,40 @@ export default function Chat() {
     return () => esRef.current?.close();
   }, [fetchSessions]);
 
-  const updateLastMessage = useCallback((mut) => {
+  // Persist active session id across page reloads.
+  useEffect(() => {
+    if (currentId) {
+      localStorage.setItem("aqi_session_id", currentId);
+    }
+  }, [currentId]);
+
+  // Snapshot the stream buffer into the last message. Called from rAF.
+  const flushStream = useCallback(() => {
+    rafRef.current = 0;
+    const buf = streamBufRef.current;
+    if (!buf || !buf.dirty) return;
+    buf.dirty = false;
+    const snap = {
+      text: buf.text,
+      reasoning: buf.reasoning,
+      toolEvents: buf.toolEvents.slice(),
+      tables: { ...buf.tables },
+    };
     setMessages((prev) => {
       if (!prev.length) return prev;
       const next = prev.slice();
-      const last = { ...next[next.length - 1] };
-      mut(last);
-      next[next.length - 1] = last;
+      next[next.length - 1] = { ...next[next.length - 1], ...snap };
       return next;
     });
   }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (!streamBufRef.current) return;
+    streamBufRef.current.dirty = true;
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(flushStream);
+    }
+  }, [flushStream]);
 
   const handleNew = useCallback(async () => {
     if (streaming) return;
@@ -160,6 +190,7 @@ export default function Chat() {
                     rows: p.rows ?? [],
                     columns: p.columns ?? [],
                     source_tool: p.source_tool,
+                    chart_hint: p.chart_hint ?? null,
                   };
                 }
                 return acc;
@@ -179,6 +210,14 @@ export default function Chat() {
     [streaming, currentId],
   );
 
+  // On mount, if a saved session exists, auto-resume it. Declared after
+  // handleSelect so the closure can call it directly.
+  useEffect(() => {
+    const saved = localStorage.getItem("aqi_session_id");
+    if (saved) handleSelect(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleDelete = useCallback(
     async (id) => {
       try {
@@ -188,6 +227,7 @@ export default function Chat() {
         if (id === currentId) {
           setCurrentId(null);
           setMessages([]);
+          localStorage.removeItem("aqi_session_id");
         }
         fetchSessions();
       } catch (err) {
@@ -204,9 +244,27 @@ export default function Chat() {
         setMessages((prev) => [
           ...prev,
           { role: "user", text },
-          { role: "assistant", text: "", toolEvents: [], tables: {} },
+          {
+            role: "assistant",
+            text: "",
+            reasoning: "",
+            toolEvents: [],
+            tables: {},
+          },
         ]);
         setStreaming(true);
+        streamBufRef.current = {
+          text: "",
+          // reasoning: assistant text emitted BEFORE the first tool_start.
+          // Surfaced inside the accordion so the user sees the model's plan
+          // before tools fire. Once any tool starts, future deltas go to
+          // `text` (the final answer body, with [[CHART:...]] tokens).
+          reasoning: "",
+          toolStarted: false,
+          toolEvents: [],
+          tables: {},
+          dirty: false,
+        };
 
         const url =
           `${API_BASE_URL}/chat/stream?session_id=${encodeURIComponent(sid)}` +
@@ -215,6 +273,12 @@ export default function Chat() {
         esRef.current = es;
 
         const close = () => {
+          if (rafRef.current) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = 0;
+          }
+          flushStream();
+          streamBufRef.current = null;
           setStreaming(false);
           es.close();
           esRef.current = null;
@@ -223,33 +287,45 @@ export default function Chat() {
 
         es.addEventListener("text_delta", (e) => {
           const data = JSON.parse(e.data);
-          updateLastMessage((m) => {
-            m.text = (m.text || "") + (data.content || "");
-          });
+          const buf = streamBufRef.current;
+          if (!buf) return;
+          if (buf.toolStarted) {
+            buf.text += data.content || "";
+          } else {
+            buf.reasoning += data.content || "";
+          }
+          scheduleFlush();
         });
 
-        const pushTool = (kind) => (e) => {
+        es.addEventListener("tool_start", (e) => {
           const data = JSON.parse(e.data);
-          updateLastMessage((m) => {
-            m.toolEvents = [...(m.toolEvents || []), { kind, ...data }];
-          });
-        };
-        es.addEventListener("tool_start", pushTool("tool_start"));
-        es.addEventListener("tool_end", pushTool("tool_end"));
+          const buf = streamBufRef.current;
+          if (!buf) return;
+          buf.toolStarted = true;
+          buf.toolEvents.push({ kind: "tool_start", ...data });
+          scheduleFlush();
+        });
+
+        es.addEventListener("tool_end", (e) => {
+          const data = JSON.parse(e.data);
+          const buf = streamBufRef.current;
+          if (!buf) return;
+          buf.toolEvents.push({ kind: "tool_end", ...data });
+          scheduleFlush();
+        });
 
         es.addEventListener("table", (e) => {
           const data = JSON.parse(e.data);
-          updateLastMessage((m) => {
-            m.toolEvents = [...(m.toolEvents || []), { kind: "table", ...data }];
-            m.tables = {
-              ...(m.tables || {}),
-              [data.name]: {
-                rows: data.rows,
-                columns: data.columns,
-                source_tool: data.source_tool,
-              },
-            };
-          });
+          const buf = streamBufRef.current;
+          if (!buf) return;
+          buf.toolEvents.push({ kind: "table", ...data });
+          buf.tables[data.name] = {
+            rows: data.rows,
+            columns: data.columns,
+            source_tool: data.source_tool,
+            chart_hint: data.chart_hint ?? null,
+          };
+          scheduleFlush();
         });
 
         es.addEventListener("run_completed", () => close());
@@ -285,7 +361,7 @@ export default function Chat() {
         }
       })();
     },
-    [currentId, streaming, fetchSessions, updateLastMessage],
+    [currentId, streaming, fetchSessions, flushStream, scheduleFlush],
   );
 
   const sidebar = (

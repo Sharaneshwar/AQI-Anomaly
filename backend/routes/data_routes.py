@@ -3,6 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel
 import aiohttp
+import asyncio
 import logging
 from statistics import mean
 import csv
@@ -10,6 +11,11 @@ from io import StringIO
 
 # Import configuration
 from config import CITY_SITES, SITES_DATA, API_BASE_URL, API_KEY, get_site_info, get_city_sites, get_all_cities
+from aqi_agent.retry import RETRYABLE_AIOHTTP, call_with_retry, is_retryable_status
+
+
+class _RetryableHTTPStatus(Exception):
+    pass
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -57,33 +63,51 @@ async def fetch_air_quality_data(site_id: str, start: str, end: str):
     
     logger.info(f"Fetching data for {site_id} from {start} to {end}")
     logger.debug(f"API URL: {url}")
-    
-    try:
+
+    async def _attempt() -> str:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as response:
                 if response.status == 200:
-                    # Get the response as text (CSV format)
-                    csv_data = await response.text()
-                    logger.info(f"✅ Successfully fetched data for {site_id}")
-                    logger.debug(f"First 200 chars: {csv_data[:200]}")
-                    return csv_data
-                else:
-                    logger.error(f"❌ API request failed for {site_id} with status {response.status}")
-                    raise HTTPException(
-                        status_code=response.status,
-                        detail=f"Failed to fetch data from external API: {response.status}"
-                    )
+                    return await response.text()
+                if is_retryable_status(response.status):
+                    raise _RetryableHTTPStatus(f"HTTP {response.status}")
+                # Non-retryable HTTP error — surface as HTTPException.
+                raise HTTPException(
+                    status_code=response.status,
+                    detail=f"Failed to fetch data from external API: {response.status}",
+                )
+
+    try:
+        csv_data = await call_with_retry(
+            _attempt,
+            attempts=3,
+            timeout=20,
+            base_delay=0.5,
+            retry_on=RETRYABLE_AIOHTTP + (_RetryableHTTPStatus,),
+            label=f"respirer {site_id}",
+        )
+        logger.info(f"✅ Successfully fetched data for {site_id}")
+        logger.debug(f"First 200 chars: {csv_data[:200]}")
+        return csv_data
+    except HTTPException:
+        raise
+    except _RetryableHTTPStatus as e:
+        logger.error(f"❌ Respirer kept returning a transient error for {site_id}: {e}")
+        raise HTTPException(status_code=503, detail=f"Upstream API unavailable: {e}")
     except aiohttp.ClientError as e:
         logger.error(f"❌ Network error fetching data for {site_id}: {str(e)}")
         raise HTTPException(
             status_code=503,
-            detail=f"Error connecting to air quality API: {str(e)}"
+            detail=f"Error connecting to air quality API: {str(e)}",
         )
+    except asyncio.TimeoutError:
+        logger.error(f"❌ Timeout fetching data for {site_id}")
+        raise HTTPException(status_code=504, detail=f"Timeout fetching data for {site_id}")
     except Exception as e:
         logger.error(f"❌ Unexpected error for {site_id}: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 def process_csv_response(csv_data: str):

@@ -10,8 +10,10 @@ Tables:
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import json
+import logging
 import time
 import uuid
 from typing import Any
@@ -31,7 +33,23 @@ from aqi_agent.events import (
     ToolStart,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+
+async def _bounded_db(coro: Any, *, timeout: float, label: str) -> None:
+    """Run a fire-and-forget DB write with a timeout. Log + swallow on failure.
+
+    Used for SSE-side persistence (observation rows + trace finalisation).
+    A blocked DB shouldn't keep the cleanup task alive past `timeout`.
+    """
+    try:
+        await asyncio.wait_for(coro, timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.warning("%s timed out after %.0fs", label, timeout)
+    except Exception:  # noqa: BLE001
+        logger.exception("%s failed", label)
 
 EVENT_NAME: dict[type, str] = {
     RunStarted: "run_started",
@@ -42,6 +60,13 @@ EVENT_NAME: dict[type, str] = {
     TextDelta: "text_delta",
     RunCompleted: "run_completed",
 }
+
+# Only these kinds are persisted to chat_observations. The frontend
+# reconstructs sessions from {tool_start, tool_end, table} only — every
+# other kind is write-amplification on Supabase. text_delta in particular
+# fires hundreds of times per turn; the full assistant response is
+# already saved as `chat_traces.response` once at finalize time.
+_PERSIST_OBSERVATION_KINDS = frozenset({"tool_start", "tool_end", "table"})
 
 
 def _event_payload(ev: Any) -> dict:
@@ -139,6 +164,12 @@ async def chat_stream(session_id: str, prompt: str, request: Request):
 
         accumulated_text: list[str] = []
         client_disconnected = False
+        error: Exception | None = None
+        # Per-event DB writes happen as background tasks so they don't add
+        # serialised round-trip latency to the SSE stream. We await them
+        # together inside _finalize so observations land before the trace
+        # status flips to 'completed'.
+        obs_tasks: list[asyncio.Task] = []
         try:
             async for ev in agent.stream(prompt, message_history=history):
                 # Re-check on every event but DO NOT abort the iterator — letting
@@ -153,7 +184,14 @@ async def chat_stream(session_id: str, prompt: str, request: Request):
                 name = payload.get("name") if kind in ("tool_start", "tool_end", "table") else None
                 iteration = payload.get("iteration") if "iteration" in payload else payload.get("n")
 
-                await db.chat_record_observation(trace_id, iteration, kind, name, payload)
+                if kind in _PERSIST_OBSERVATION_KINDS:
+                    obs_tasks.append(asyncio.create_task(
+                        _bounded_db(
+                            db.chat_record_observation(trace_id, iteration, kind, name, payload),
+                            timeout=30,
+                            label=f"chat_record_observation[{kind}]",
+                        )
+                    ))
 
                 if isinstance(ev, TextDelta):
                     accumulated_text.append(payload.get("content", ""))
@@ -161,25 +199,63 @@ async def chat_stream(session_id: str, prompt: str, request: Request):
                 if not client_disconnected:
                     yield _event_to_sse(ev)
 
-            # Finalize the trace — runs regardless of disconnect so the row
-            # is consistent even when the user navigates away mid-stream.
-            response_text = "".join(accumulated_text)
-            new_history = agent.last_history
-            history_json = ModelMessagesTypeAdapter.dump_json(new_history) if new_history else None
-            latency_ms = int((time.perf_counter() - started) * 1000)
-            await db.chat_complete_trace(
-                trace_id=trace_id,
-                response=response_text,
-                pydantic_history_json=history_json,
-                latency_ms=latency_ms,
-                session_id=session_id,
-                is_first_turn=is_first_turn,
-                title_seed=prompt if is_first_turn else None,
-            )
-
         except Exception as exc:  # noqa: BLE001
-            await db.chat_error_trace(trace_id, repr(exc))
+            error = exc
             if not client_disconnected:
                 yield {"event": "agent_error", "data": json.dumps({"error": repr(exc)})}
+
+        finally:
+            # The frontend closes its EventSource on `run_completed`, which
+            # cancels this ASGI task and raises GeneratorExit / CancelledError
+            # (BaseException — not caught by `except Exception` above).
+            # Without this finally block, chat_complete_trace never ran and
+            # traces stayed at status='running' with pydantic_history=NULL,
+            # so subsequent turns loaded no history and the agent had no
+            # conversational context. Shielded so the DB writes survive
+            # cancellation of the surrounding task.
+            async def _finalize() -> None:
+                # Drain background observation writes so they land before
+                # we flip the trace status. Bounded to keep cleanup brief
+                # if the DB is slow.
+                if obs_tasks:
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.gather(*obs_tasks, return_exceptions=True),
+                            timeout=15,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.warning(
+                            "draining %d observation writes timed out",
+                            len(obs_tasks),
+                        )
+                if error is not None:
+                    await _bounded_db(
+                        db.chat_error_trace(trace_id, repr(error)),
+                        timeout=10,
+                        label="chat_error_trace",
+                    )
+                    return
+                response_text = "".join(accumulated_text)
+                new_history = agent.last_history
+                history_json = (
+                    ModelMessagesTypeAdapter.dump_json(new_history)
+                    if new_history else None
+                )
+                latency_ms = int((time.perf_counter() - started) * 1000)
+                await _bounded_db(
+                    db.chat_complete_trace(
+                        trace_id=trace_id,
+                        response=response_text,
+                        pydantic_history_json=history_json,
+                        latency_ms=latency_ms,
+                        session_id=session_id,
+                        is_first_turn=is_first_turn,
+                        title_seed=prompt if is_first_turn else None,
+                    ),
+                    timeout=10,
+                    label="chat_complete_trace",
+                )
+
+            await asyncio.shield(asyncio.create_task(_finalize()))
 
     return EventSourceResponse(gen())

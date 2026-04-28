@@ -44,6 +44,7 @@ class Table:
     source_tool: str
     iteration: int
     columns: list[str] = field(default_factory=list)
+    chart_hint: str | None = None  # tool's recommended chart type
 
 
 @dataclass

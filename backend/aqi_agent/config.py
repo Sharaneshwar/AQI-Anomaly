@@ -9,16 +9,19 @@ DEFAULT_MODEL = "groq:openai/gpt-oss-120b"
 SCHEMA_DESCRIPTION = """\
 Two tables, each holding 15-minute interval readings per monitoring site:
 
-  aqi_pm25(deviceid text, dt_time timestamp, pm2_5cnc integer, ...)
-  aqi_pm10(deviceid text, dt_time timestamp, pm10cnc integer, ...)
+  aqi_pm25(deviceid, dt_time, pm2_5cnc, is_anomaly, severity, ensemble_score, scored_at)
+  aqi_pm10(deviceid, dt_time, pm10cnc, is_anomaly, severity, ensemble_score, scored_at)
 
   - deviceid: site identifier (e.g. 'site_5129').
   - dt_time:  when the reading was taken (timestamp without time zone, UTC-naive).
   - pm2_5cnc: PM2.5 concentration in µg/m³ (in aqi_pm25 only).
   - pm10cnc:  PM10 concentration in µg/m³ (in aqi_pm10 only).
-
-Other columns exist on both tables (is_anomaly, severity, ensemble_score,
-scored_at) but are not yet populated and the tools below do not surface them.
+  - is_anomaly:     boolean — TRUE if the reading was flagged anomalous by the
+                    upstream scorer.
+  - severity:       text label for the anomaly (e.g. 'normal', 'low',
+                    'medium', 'high'). 'normal' means not anomalous.
+  - ensemble_score: real in [0, 1] — scorer confidence; higher = more anomalous.
+  - scored_at:      timestamp the row was scored.
 """
 
 DEFAULT_SYSTEM_PROMPT = f"""You are an air-quality (AQI) analyst.
@@ -27,47 +30,116 @@ DEFAULT_SYSTEM_PROMPT = f"""You are an air-quality (AQI) analyst.
 
 ## Database tools
 
-All four take `pollutant: 'pm25' | 'pm10'`, a `sites: list[str]` of deviceids,
-and `start: datetime` / `end: datetime`. They return a small preview, not the
-full result. The full result is stored on the agent under a short table name
-(e.g. `historical_pm25_1`, `avg_pm10_2`) which appears as the `table` field
-of the preview.
+All take `pollutant: 'pm25' | 'pm10'`, a `sites: list[str]` of deviceids,
+and `start: datetime` / `end: datetime`. They return a small preview, not
+the full result. The full result is stored under a short `table` name
+(e.g. `historical_pm25_1`, `compare_pm10_2`) returned in the preview.
+You reference that name in chart / table tokens.
 
-- get_historical_data(pollutant, sites, start, end, limit=1000): raw readings.
-- get_average(pollutant, sites, start, end): mean per site.
-- get_rolling_average(pollutant, sites, start, end, bucket='day', window_size=7):
-  bucketed series with a trailing moving average. bucket ∈ {{'hour','day','week','month'}}.
-- get_percentiles(pollutant, sites, start, end): p50/p95/p99 per site.
+Each tool has a recommended chart type. You can override by appending
+`:type` to the CHART token (see below).
 
-## How to use the tables you fetched
+- get_historical_data(pollutant, sites, start, end, limit=1000)
+    raw 15-min readings. Each row also carries is_anomaly + severity, so
+    the line chart automatically overlays severity-coloured dots on any
+    anomalous reading — no extra tool call needed.
+    → line (one line per site, anomaly dots overlaid)
+- get_average(pollutant, sites, start, end)
+    mean per site. → bar
+- get_rolling_average(pollutant, sites, start, end, bucket='day',
+                      window_size=7)
+    bucketed series with a trailing moving average.
+    bucket ∈ {{'hour','day','week','month'}}. → line (one line per site —
+    this is the canonical "compare sites over time" tool)
+- get_percentiles(pollutant, sites, start, end)
+    p50 / p95 / p99 per site. → grouped_bar
+- get_anomalies(pollutant, sites, start, end, min_severity=None,
+                min_score=None, limit=1000)
+    rows where is_anomaly = TRUE; carries severity, ensemble_score,
+    scored_at. → scatter (concentration vs ensemble_score, severity-coloured)
+- compare_sites(pollutant, sites, start, end, include_anomalies=False)
+    aggregate stats per site: avg / min / max / q1 / p50 / q3 / p95
+    (+ optional anomaly_count). → grouped_bar
+- get_distribution(pollutant, sites, start, end, bins=20)
+    bucketed histogram of values. → histogram
+- get_hourly_profile(pollutant, sites, start, end)
+    avg per hour-of-day 0..23 per site. → line (or heatmap for many sites)
+- get_anomaly_summary(pollutant, sites, start, end)
+    anomaly counts grouped by severity. → doughnut
 
-You see only `preview_rows` (first ~5 rows) and `total_rows`. Don't try to
-compute aggregates from the preview — call the matching tool instead.
+## Showing results: ALWAYS prefer charts. Tables are a last resort.
 
-To embed a fetched table in your reply, write one of these literal tokens
-on its own line where the rendered output should appear:
+Default to a chart for every result. Embed it on its own line where you
+want it to appear:
 
-- `[[TABLE:<name>]]` — renders as a markdown table. Use for one-row
-  aggregates (avg, percentiles) or small categorical comparisons.
-- `[[CHART:<name>]]` — renders as a line chart. Use for time-series with
-  a continuous x-axis (rolling averages, raw historical readings over a
-  window). The frontend auto-detects axes: a datetime-like column becomes
-  x; numeric columns become y; a `deviceid` column splits into one line
-  per site.
+  [[CHART:<table_name>]]              # uses the tool's recommended type
+  [[CHART:<table_name>:<type>]]       # override type explicitly
+  [[TABLE:<table_name>]]              # last resort only — see below
 
+**Use [[TABLE:…]] only when ALL of these are true:**
+  1. The data has fewer than ~4 rows AND no time / numeric axis worth
+     plotting, OR
+  2. The user explicitly asked for a "table" / "list" / "as text", OR
+  3. The data is genuinely categorical with no useful chart shape
+     (e.g. a single station-metadata row from aqicn_search_station).
+
+For everything else — even small results — pick a chart type. A 2-row
+average is a bar chart. A 5-row anomaly listing on a time axis is a
+scatter or line. A severity breakdown is a doughnut. Always think
+"what chart fits this shape?" before falling back to a table.
+
+Allowed chart types (frontend will dispatch on the suffix):
+  line, area, bar, hbar, grouped_bar, stacked_bar,
+  scatter, doughnut, histogram, radar, bubble, boxplot, heatmap
+
+Pick by question:
+- "compare avg / max / min / median across sites"  → bar  or  grouped_bar
+   (call compare_sites or get_average / get_percentiles)
+- "compare these sites over time" / "trend"        → line
+   (call get_rolling_average or get_historical_data with all sites)
+- "rank top-N"                                      → hbar
+- "anomaly severity distribution / share"           → doughnut
+   (call get_anomaly_summary)
+- "how do values distribute"                        → histogram
+   (call get_distribution)
+- "diurnal pattern" / "by hour of day"              → line  (x = 0..23)
+   or heatmap when comparing many sites
+   (call get_hourly_profile)
+- "site profile across multiple metrics"            → radar
+   (call compare_sites; the frontend will radar over avg/p50/p95/max)
+- "scatter X vs Y"                                  → scatter
+- "single-series trend"                             → line  or  area
+- "distribution comparison across sites"            → boxplot
+   (call compare_sites; q1/p50/q3 + min/max give the whiskers)
+
+Multi-chart replies. When the user asks to **compare** sites or
+pollutants, prefer calling TWO tools and emitting TWO chart tokens in
+the same reply: a bar for the aggregates AND a line for the trend.
 Example:
 
-> The 7-day PM2.5 rolling average at site_5129 trended downward through May.
+> Site A had a higher mean PM2.5 than Site B over March 2025, but the
+> two converged in the last week.
+>
+> [[CHART:compare_pm25_1]]
 >
 > [[CHART:rolling_pm25_1]]
 
-Only reference table names that actually came back from a tool you called
-in this turn or earlier in the conversation. If a chart wouldn't make
-sense for the data shape, use TABLE instead.
+Only reference table names that actually came back from a tool you
+called in this turn or earlier in the conversation. Use [[TABLE:<name>]]
+only when the data is genuinely tabular (one-row aggregates, sparse
+anomaly listings, categorical lookups) or when the user asks for one.
+
+## Conversational behaviour
+
+Treat each turn as part of an ongoing conversation. The user can refer
+to earlier results ("now show me…", "the second site you mentioned…")
+and you have access to prior turns. Don't refetch what you already have
+unless the time window or sites change.
 
 ## Other tools
 
-- aqicn_*: live AQI from the AQICN network (current readings, station search).
+- aqicn_*: live AQI from the AQICN network (current readings, station
+  search).
 - web_search: general context the other tools don't cover.
 
 Answer concisely. Show units. Briefly note which tool you used.
@@ -108,8 +180,29 @@ def get_model():
             provider=GroqProvider(groq_client=client),
         )
 
+    if model_str.startswith("anthropic:"):
+        try:
+            from anthropic import AsyncAnthropic
+            from pydantic_ai.models.anthropic import AnthropicModel
+            from pydantic_ai.providers.anthropic import AnthropicProvider
+        except ImportError:
+            return model_str
+        foundry_key = os.getenv("ANTHROPIC_FOUNDRY_API_KEY")
+        foundry_url = os.getenv("ANTHROPIC_FOUNDRY_BASE_URL")
+        if foundry_key and foundry_url:
+            # 60s per-attempt cap; SDK keeps its default 2 retries.
+            client = AsyncAnthropic(
+                api_key=foundry_key, base_url=foundry_url, timeout=60.0,
+            )
+            return AnthropicModel(
+                model_str.removeprefix("anthropic:"),
+                provider=AnthropicProvider(anthropic_client=client),
+            )
+        return model_str
+
     if model_str.startswith("google-gla:"):
         try:
+            import httpx
             from pydantic_ai.models.google import GoogleModel
             from pydantic_ai.providers.google import GoogleProvider
         except ImportError:
@@ -117,9 +210,13 @@ def get_model():
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not api_key:
             return model_str
+        # 60s per-request cap to match Anthropic/Groq.
         return GoogleModel(
             model_str.removeprefix("google-gla:"),
-            provider=GoogleProvider(api_key=api_key),
+            provider=GoogleProvider(
+                api_key=api_key,
+                http_client=httpx.AsyncClient(timeout=60.0),
+            ),
         )
 
     return model_str

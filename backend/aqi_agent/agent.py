@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, AsyncIterator, Sequence
+from typing import Any, AsyncIterator, Awaitable, Callable, Sequence
 
+import asyncpg
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import (
     FunctionToolCallEvent,
@@ -38,8 +40,50 @@ from aqi_agent.events import (
     ToolStart,
 )
 from aqi_agent.observability import setup_observability
+from aqi_agent.retry import call_with_retry
 from aqi_agent.tables import TableStore
 from aqi_agent.tools import aqicn, web_search as ws
+
+logger = logging.getLogger(__name__)
+
+_RETRYABLE_DB: tuple[type[BaseException], ...] = (
+    asyncio.TimeoutError,
+    asyncpg.exceptions.ConnectionDoesNotExistError,
+    asyncpg.exceptions.InterfaceError,
+)
+
+
+async def _run_bounded_tool(
+    label: str,
+    work_factory: Callable[[], Awaitable[dict]],
+    *,
+    timeout: float = 30.0,
+) -> dict:
+    """Run a DB tool body with timeout + 1 retry. Return error dict on failure.
+
+    On timeout or transient asyncpg error: 1 retry. On final failure: a dict
+    the LLM can read mid-conversation (`{"error": ..., "table": None}`),
+    rather than raising and aborting the whole stream.
+    """
+    try:
+        return await call_with_retry(
+            work_factory,
+            attempts=2,
+            timeout=timeout,
+            base_delay=0.5,
+            retry_on=_RETRYABLE_DB,
+            label=label,
+        )
+    except asyncio.TimeoutError:
+        msg = (
+            f"{label} timed out after {timeout:.0f}s — try a narrower "
+            "filter (fewer sites or shorter window)."
+        )
+        logger.warning(msg)
+        return {"error": msg, "table": None}
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("%s failed", label)
+        return {"error": f"{label} failed: {exc}", "table": None}
 
 
 @dataclass
@@ -49,15 +93,22 @@ class AQIDeps:
 
 
 def _preview(
-    tables: TableStore, prefix: str, rows: list[dict], preview_n: int = 5
+    tables: TableStore,
+    prefix: str,
+    rows: list[dict],
+    preview_n: int = 5,
+    chart_hint: str | None = None,
 ) -> dict:
     name = tables.add(prefix, rows)
-    return {
+    out: dict = {
         "table": name,
         "preview_rows": rows[:preview_n],
         "total_rows": len(rows),
         "columns": list(rows[0].keys()) if rows else [],
     }
+    if chart_hint:
+        out["chart_hint"] = chart_hint
+    return out
 
 
 class AQIAgent:
@@ -129,10 +180,15 @@ class AQIAgent:
                 limit: max rows fetched (default 1000). Reduce if total_rows
                     is at the limit and you suspect there's more relevant data.
             """
-            rows = await ctx.deps.db.get_historical_data(
-                pollutant, sites, start, end, limit
-            )
-            return _preview(ctx.deps.tables, f"historical_{pollutant}", rows)
+            async def _work() -> dict:
+                rows = await ctx.deps.db.get_historical_data(
+                    pollutant, sites, start, end, limit
+                )
+                return _preview(
+                    ctx.deps.tables, f"historical_{pollutant}", rows,
+                    chart_hint="line",
+                )
+            return await _run_bounded_tool("get_historical_data", _work)
 
         @agent.tool
         async def get_average(
@@ -143,8 +199,12 @@ class AQIAgent:
             end: datetime,
         ) -> dict:
             """Mean PM2.5 or PM10 per site over a window. Preview-only return."""
-            rows = await ctx.deps.db.get_average(pollutant, sites, start, end)
-            return _preview(ctx.deps.tables, f"avg_{pollutant}", rows)
+            async def _work() -> dict:
+                rows = await ctx.deps.db.get_average(pollutant, sites, start, end)
+                return _preview(
+                    ctx.deps.tables, f"avg_{pollutant}", rows, chart_hint="bar"
+                )
+            return await _run_bounded_tool("get_average", _work)
 
         @agent.tool
         async def get_rolling_average(
@@ -162,10 +222,15 @@ class AQIAgent:
                 bucket: 'hour' | 'day' | 'week' | 'month'.
                 window_size: number of buckets in the trailing window (default 7).
             """
-            rows = await ctx.deps.db.get_rolling_average(
-                pollutant, sites, start, end, bucket, window_size
-            )
-            return _preview(ctx.deps.tables, f"rolling_{pollutant}", rows)
+            async def _work() -> dict:
+                rows = await ctx.deps.db.get_rolling_average(
+                    pollutant, sites, start, end, bucket, window_size
+                )
+                return _preview(
+                    ctx.deps.tables, f"rolling_{pollutant}", rows,
+                    chart_hint="line",
+                )
+            return await _run_bounded_tool("get_rolling_average", _work)
 
         @agent.tool
         async def get_percentiles(
@@ -176,8 +241,177 @@ class AQIAgent:
             end: datetime,
         ) -> dict:
             """p50/p95/p99 of the pollutant per site over a window. Preview-only return."""
-            rows = await ctx.deps.db.get_percentiles(pollutant, sites, start, end)
-            return _preview(ctx.deps.tables, f"percentiles_{pollutant}", rows)
+            async def _work() -> dict:
+                rows = await ctx.deps.db.get_percentiles(pollutant, sites, start, end)
+                return _preview(
+                    ctx.deps.tables, f"percentiles_{pollutant}", rows,
+                    chart_hint="grouped_bar",
+                )
+            return await _run_bounded_tool("get_percentiles", _work)
+
+        @agent.tool
+        async def get_anomalies(
+            ctx: RunContext[AQIDeps],
+            pollutant: Pollutant,
+            sites: list[str],
+            start: datetime,
+            end: datetime,
+            min_severity: str | None = None,
+            min_score: float | None = None,
+            limit: int = 1000,
+        ) -> dict:
+            """Historical anomalies for the given sites and time window.
+
+            Filters to rows where is_anomaly = TRUE. Returns columns
+            deviceid, dt_time, <pm2_5cnc|pm10cnc>, severity, ensemble_score,
+            scored_at — ordered by ensemble_score desc.
+
+            Args:
+                pollutant: 'pm25' or 'pm10'.
+                sites: list of deviceid values.
+                start: inclusive lower bound on dt_time.
+                end: inclusive upper bound on dt_time.
+                min_severity: optional exact severity match (e.g. 'high').
+                min_score: optional lower bound on ensemble_score (0..1).
+                limit: max rows fetched (default 1000).
+            """
+            async def _work() -> dict:
+                rows = await ctx.deps.db.get_anomalies(
+                    pollutant, sites, start, end, min_severity, min_score, limit
+                )
+                return _preview(
+                    ctx.deps.tables, f"anomalies_{pollutant}", rows,
+                    # Default to scatter (concentration vs ensemble_score) — looks
+                    # great visually. Use [[TABLE:…]] explicitly when the user
+                    # asked for a list of anomalies.
+                    chart_hint="scatter",
+                )
+            return await _run_bounded_tool("get_anomalies", _work)
+
+        @agent.tool
+        async def compare_sites(
+            ctx: RunContext[AQIDeps],
+            pollutant: Pollutant,
+            sites: list[str],
+            start: datetime,
+            end: datetime,
+            include_anomalies: bool = False,
+        ) -> dict:
+            """Per-site aggregates over a window: avg, min, max, q1, p50, q3, p95.
+
+            Use this to compare sites side-by-side (avg / max / min / median).
+            For comparing trends *over time*, call get_rolling_average with all
+            sites instead — that returns one line per site. The two are
+            complementary: a strong "compare" answer often emits BOTH a bar
+            (compare_sites) AND a line (get_rolling_average).
+
+            Args:
+                pollutant: 'pm25' or 'pm10'.
+                sites: list of deviceids to compare.
+                start, end: inclusive bounds on dt_time.
+                include_anomalies: if True, also includes anomaly_count per site.
+
+            Default chart: grouped_bar. Variants the LLM may pick:
+                bar (single metric), hbar (ranked), radar (site profile),
+                bubble (avg vs p95 with anomaly_count as size),
+                boxplot (whiskers from min/q1/median/q3/max).
+            """
+            async def _work() -> dict:
+                rows = await ctx.deps.db.compare_sites(
+                    pollutant, sites, start, end, include_anomalies
+                )
+                return _preview(
+                    ctx.deps.tables, f"compare_{pollutant}", rows,
+                    chart_hint="grouped_bar",
+                )
+            return await _run_bounded_tool("compare_sites", _work)
+
+        @agent.tool
+        async def get_distribution(
+            ctx: RunContext[AQIDeps],
+            pollutant: Pollutant,
+            sites: list[str],
+            start: datetime,
+            end: datetime,
+            bins: int = 20,
+        ) -> dict:
+            """Bucketed histogram of pollutant values, one row per (site, bucket).
+
+            Each row carries bin_start / bin_end so the frontend can label the
+            x-axis. Use to answer "how do the values distribute" questions.
+
+            Args:
+                pollutant: 'pm25' or 'pm10'.
+                sites: list of deviceids.
+                start, end: inclusive bounds on dt_time.
+                bins: number of buckets (2..200, default 20).
+            """
+            async def _work() -> dict:
+                rows = await ctx.deps.db.get_distribution(
+                    pollutant, sites, start, end, bins
+                )
+                return _preview(
+                    ctx.deps.tables, f"distribution_{pollutant}", rows,
+                    chart_hint="histogram",
+                )
+            return await _run_bounded_tool("get_distribution", _work)
+
+        @agent.tool
+        async def get_hourly_profile(
+            ctx: RunContext[AQIDeps],
+            pollutant: Pollutant,
+            sites: list[str],
+            start: datetime,
+            end: datetime,
+        ) -> dict:
+            """Average concentration per hour-of-day (0..23) per site.
+
+            Use for diurnal-pattern questions ("at what time of day is PM
+            highest?"). Default chart is line; the LLM may also pick heatmap
+            (sites × hours) for multi-site comparisons.
+
+            Args:
+                pollutant: 'pm25' or 'pm10'.
+                sites: list of deviceids.
+                start, end: inclusive bounds on dt_time.
+            """
+            async def _work() -> dict:
+                rows = await ctx.deps.db.get_hourly_profile(
+                    pollutant, sites, start, end
+                )
+                return _preview(
+                    ctx.deps.tables, f"hourly_{pollutant}", rows,
+                    chart_hint="line",
+                )
+            return await _run_bounded_tool("get_hourly_profile", _work)
+
+        @agent.tool
+        async def get_anomaly_summary(
+            ctx: RunContext[AQIDeps],
+            pollutant: Pollutant,
+            sites: list[str],
+            start: datetime,
+            end: datetime,
+        ) -> dict:
+            """Anomaly counts grouped by severity (rolled up across sites).
+
+            Use for "what's the share of severities?" / "breakdown of
+            anomalies" questions. Default chart is doughnut.
+
+            Args:
+                pollutant: 'pm25' or 'pm10'.
+                sites: list of deviceids.
+                start, end: inclusive bounds on dt_time.
+            """
+            async def _work() -> dict:
+                rows = await ctx.deps.db.get_anomaly_summary(
+                    pollutant, sites, start, end
+                )
+                return _preview(
+                    ctx.deps.tables, f"anomaly_summary_{pollutant}", rows,
+                    chart_hint="doughnut",
+                )
+            return await _run_bounded_tool("get_anomaly_summary", _work)
 
         if get_aqicn_token():
 
@@ -288,6 +522,7 @@ class AQIAgent:
                                                 source_tool=tool_name,
                                                 iteration=iteration,
                                                 columns=content.get("columns") or [],
+                                                chart_hint=content.get("chart_hint"),
                                             )
                     elif Agent.is_end_node(node):
                         yield Iteration(n=iteration, kind="end")

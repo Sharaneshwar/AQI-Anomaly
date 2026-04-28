@@ -41,10 +41,15 @@ class Database:
             return
         self._pool = await asyncpg.create_pool(
             self._dsn,
-            min_size=1,
-            max_size=5,
+            min_size=2,
+            max_size=20,
             ssl="require",
-            statement_cache_size=0,
+            # Session-mode pooler (port 5432) supports prepared statements,
+            # so we leave the asyncpg statement cache at its default (100).
+            command_timeout=45,
+            # Recycle idle connections before the pooler's idle timeout so
+            # we don't hand out a half-dead connection to a tool call.
+            max_inactive_connection_lifetime=60.0,
         )
 
     async def close(self) -> None:
@@ -259,9 +264,15 @@ class Database:
         end: datetime,
         limit: int = 1000,
     ) -> list[dict]:
+        """Raw 15-min readings, including the per-row anomaly flag + severity.
+
+        is_anomaly / severity travel with each row so the line chart can
+        overlay anomaly markers (severity-coloured dots) on the time axis
+        without a second tool call.
+        """
         table, col = _resolve(pollutant)
         sql = f"""
-            SELECT deviceid, dt_time, {col}
+            SELECT deviceid, dt_time, {col}, is_anomaly, severity
             FROM {table}
             WHERE deviceid = ANY($1::text[])
               AND dt_time >= $2
@@ -272,6 +283,42 @@ class Database:
         return await self._fetch_dicts(
             sql, sites, _strip_tz(start), _strip_tz(end), limit
         )
+
+    async def get_anomalies(
+        self,
+        pollutant: Pollutant,
+        sites: list[str],
+        start: datetime,
+        end: datetime,
+        min_severity: str | None = None,
+        min_score: float | None = None,
+        limit: int = 1000,
+    ) -> list[dict]:
+        """Rows where is_anomaly = TRUE, ordered by ensemble_score desc."""
+        table, col = _resolve(pollutant)
+        conds = [
+            "deviceid = ANY($1::text[])",
+            "dt_time >= $2",
+            "dt_time <= $3",
+            "is_anomaly = TRUE",
+        ]
+        args: list[Any] = [sites, _strip_tz(start), _strip_tz(end)]
+        if min_score is not None:
+            args.append(float(min_score))
+            conds.append(f"ensemble_score >= ${len(args)}")
+        if min_severity is not None:
+            args.append(min_severity)
+            conds.append(f"severity = ${len(args)}")
+        args.append(limit)
+        sql = f"""
+            SELECT deviceid, dt_time, {col},
+                   severity, ensemble_score, scored_at
+            FROM {table}
+            WHERE {" AND ".join(conds)}
+            ORDER BY ensemble_score DESC NULLS LAST, dt_time ASC
+            LIMIT ${len(args)}
+        """
+        return await self._fetch_dicts(sql, *args)
 
     async def get_average(
         self,
@@ -365,6 +412,157 @@ class Database:
               AND dt_time >= $2 AND dt_time <= $3
             GROUP BY deviceid
             ORDER BY deviceid
+        """
+        return await self._fetch_dicts(
+            sql, sites, _strip_tz(start), _strip_tz(end)
+        )
+
+    async def compare_sites(
+        self,
+        pollutant: Pollutant,
+        sites: list[str],
+        start: datetime,
+        end: datetime,
+        include_anomalies: bool = False,
+    ) -> list[dict]:
+        """One row per site with avg / p25 / p50 / p75 / p95 / max / sample_count.
+
+        Optionally includes anomaly_count (rows where is_anomaly=TRUE).
+        Drives bar / grouped_bar / radar / bubble / boxplot charts.
+        """
+        table, col = _resolve(pollutant)
+        anomaly_select = (
+            ", COUNT(*) FILTER (WHERE is_anomaly) AS anomaly_count"
+            if include_anomalies
+            else ""
+        )
+        sql = f"""
+            SELECT
+                deviceid,
+                AVG({col})::float AS avg_value,
+                MIN({col})::float AS min_value,
+                MAX({col})::float AS max_value,
+                PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY {col}) AS q1,
+                PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY {col}) AS p50,
+                PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY {col}) AS q3,
+                PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY {col}) AS p95,
+                COUNT(*) AS sample_count
+                {anomaly_select}
+            FROM {table}
+            WHERE deviceid = ANY($1::text[])
+              AND dt_time >= $2 AND dt_time <= $3
+            GROUP BY deviceid
+            ORDER BY avg_value DESC NULLS LAST
+        """
+        return await self._fetch_dicts(
+            sql, sites, _strip_tz(start), _strip_tz(end)
+        )
+
+    async def get_distribution(
+        self,
+        pollutant: Pollutant,
+        sites: list[str],
+        start: datetime,
+        end: datetime,
+        bins: int = 20,
+    ) -> list[dict]:
+        """Bucketed histogram: counts per (site, bucket) over the [min, max] range.
+
+        Each row carries bin_start / bin_end so the frontend can label
+        the x-axis without a second query.
+        """
+        if bins < 2 or bins > 200:
+            raise ValueError("bins must be between 2 and 200")
+        table, col = _resolve(pollutant)
+        sql = f"""
+            WITH bounds AS (
+                SELECT
+                    MIN({col})::float AS lo,
+                    MAX({col})::float AS hi
+                FROM {table}
+                WHERE deviceid = ANY($1::text[])
+                  AND dt_time >= $2 AND dt_time <= $3
+            ),
+            bucketed AS (
+                SELECT
+                    t.deviceid,
+                    width_bucket(
+                        t.{col}::float,
+                        b.lo,
+                        b.hi + 1e-9,  -- avoid landing on the upper bound exactly
+                        $4
+                    ) AS bucket,
+                    b.lo, b.hi
+                FROM {table} t, bounds b
+                WHERE t.deviceid = ANY($1::text[])
+                  AND t.dt_time >= $2 AND t.dt_time <= $3
+                  AND t.{col} IS NOT NULL
+            )
+            SELECT
+                deviceid,
+                bucket,
+                COUNT(*) AS freq,
+                MIN(lo) + (bucket - 1) * (MIN(hi) - MIN(lo)) / $4 AS bin_start,
+                MIN(lo) + bucket * (MIN(hi) - MIN(lo)) / $4 AS bin_end
+            FROM bucketed
+            GROUP BY deviceid, bucket
+            ORDER BY deviceid, bucket
+        """
+        return await self._fetch_dicts(
+            sql, sites, _strip_tz(start), _strip_tz(end), bins
+        )
+
+    async def get_hourly_profile(
+        self,
+        pollutant: Pollutant,
+        sites: list[str],
+        start: datetime,
+        end: datetime,
+    ) -> list[dict]:
+        """Average concentration per (site, hour-of-day 0..23).
+
+        Drives a diurnal-pattern line chart, or a heatmap when pivoted.
+        """
+        table, col = _resolve(pollutant)
+        sql = f"""
+            SELECT
+                deviceid,
+                EXTRACT(HOUR FROM dt_time)::int AS hour,
+                AVG({col})::float AS avg_value,
+                COUNT(*) AS sample_count
+            FROM {table}
+            WHERE deviceid = ANY($1::text[])
+              AND dt_time >= $2 AND dt_time <= $3
+            GROUP BY deviceid, hour
+            ORDER BY deviceid, hour
+        """
+        return await self._fetch_dicts(
+            sql, sites, _strip_tz(start), _strip_tz(end)
+        )
+
+    async def get_anomaly_summary(
+        self,
+        pollutant: Pollutant,
+        sites: list[str],
+        start: datetime,
+        end: datetime,
+    ) -> list[dict]:
+        """Anomaly counts grouped by severity (rolled up across the given sites).
+
+        Drives a doughnut chart of severity share. Returns rows where
+        is_anomaly = TRUE only.
+        """
+        table, _col = _resolve(pollutant)
+        sql = f"""
+            SELECT
+                COALESCE(severity, 'unknown') AS severity,
+                COUNT(*) AS n
+            FROM {table}
+            WHERE deviceid = ANY($1::text[])
+              AND dt_time >= $2 AND dt_time <= $3
+              AND is_anomaly = TRUE
+            GROUP BY severity
+            ORDER BY n DESC
         """
         return await self._fetch_dicts(
             sql, sites, _strip_tz(start), _strip_tz(end)
