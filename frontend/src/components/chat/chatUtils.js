@@ -5,7 +5,9 @@ import DOMPurify from "dompurify";
 //   [[TABLE:<name>]]                  → table fallback
 //   [[CHART:<name>]]                  → chart, type from tool's chart_hint or "line"
 //   [[CHART:<name>:<type>]]           → chart, explicit type override
+//   [[MAP:site_a,site_b,...]]         → leaflet map with the listed pins
 const TOKEN_RE = /\[\[(TABLE|CHART):([A-Za-z0-9_]+)(?::([a-z_]+))?\]\]/g;
+const MAP_RE = /\[\[MAP:([^\]\s][^\]]*)\]\]/g;
 
 export function findTokens(text) {
   if (!text) return [];
@@ -23,9 +25,28 @@ export function findTokens(text) {
   return out;
 }
 
+export function findMapTokens(text) {
+  if (!text) return [];
+  const out = [];
+  MAP_RE.lastIndex = 0;
+  let m;
+  while ((m = MAP_RE.exec(text))) {
+    const ids = m[1]
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => /^site_\d+$/.test(s));
+    if (ids.length) out.push({ siteIds: ids, index: m.index });
+  }
+  return out;
+}
+
 export function stripTokens(text) {
   if (!text) return "";
-  return text.replace(TOKEN_RE, "").replace(/\n{3,}/g, "\n\n").trim();
+  return text
+    .replace(TOKEN_RE, "")
+    .replace(MAP_RE, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // Tiny LRU so repeat renders of the same `text` (cross-component, common

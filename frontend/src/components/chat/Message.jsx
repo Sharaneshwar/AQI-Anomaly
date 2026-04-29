@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   Brain,
@@ -8,6 +8,7 @@ import {
   Wrench,
 } from "lucide-react";
 import {
+  findMapTokens,
   findTokens,
   renderMarkdown,
   resolveChartType,
@@ -15,6 +16,11 @@ import {
 } from "./chatUtils";
 import ChatTable from "./ChatTable";
 import ChartDispatcher from "./charts/ChartDispatcher";
+import MiniMapSonar from "./MiniMapSonar";
+
+// Leaflet pulls a chunk of CSS + JS — only load it when a chat actually
+// has site_ids to pin.
+const ChatMap = lazy(() => import("./ChatMap"));
 
 function inferPollutant(name) {
   if (!name) return null;
@@ -150,8 +156,23 @@ function ToolStep({ step }) {
           ↳ {step.summary}
         </pre>
       )}
+      {step.name === "find_neighbours" && <SonarHold ended={step.ended} />}
     </li>
   );
+}
+
+// find_neighbours typically returns in <50 ms (pure pkl lookup), so the
+// in-flight window is shorter than a render frame and the sonar would
+// flash invisibly. Show it for at least 1.2 s after the step first
+// renders, regardless of whether tool_end has fired.
+function SonarHold({ ended }) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(false), 2200);
+    return () => clearTimeout(t);
+  }, []);
+  if (ended && !visible) return null;
+  return <MiniMapSonar />;
 }
 
 function AgenticAccordion({ reasoning, steps, streaming, hasContent }) {
@@ -213,10 +234,17 @@ function AgenticAccordion({ reasoning, steps, streaming, hasContent }) {
   );
 }
 
+// Tools whose result rows are pure metadata (lat/lon/name) — the trailing
+// ChatMap visualises them; any chart of lat/lon as a numeric axis would
+// be nonsense. Force table rendering even when the LLM tries an explicit
+// `[[CHART:foo:hbar]]` override.
+const METADATA_TOOLS = new Set(["list_city_sites", "find_neighbours"]);
+
 function ChartCard({ token, tableMeta }) {
   const isChart = token.kind === "chart";
   const effectiveType = isChart ? resolveChartType(token, tableMeta) : null;
-  const renderAsTable = !isChart || effectiveType === "table";
+  const forceTable = METADATA_TOOLS.has(tableMeta.source_tool);
+  const renderAsTable = !isChart || effectiveType === "table" || forceTable;
   const pollutant = inferPollutant(token.name);
   return (
     <div className="rounded-xl border border-border bg-card/40 p-4 shadow-lg shadow-black/20">
@@ -293,6 +321,13 @@ export default function Message({ message, streaming }) {
   const hasAccordion =
     (message.reasoning && message.reasoning.length > 0) || steps.length > 0;
 
+  // Maps are explicit: only render where the LLM emitted [[MAP:a,b,c]].
+  // Multiple tokens → multiple maps in document order.
+  const mapTokens = useMemo(
+    () => findMapTokens(message.text || ""),
+    [message.text],
+  );
+
   return (
     <div className="text-sm leading-relaxed">
       <AgenticAccordion
@@ -323,6 +358,13 @@ export default function Message({ message, streaming }) {
             return <ChartCard key={`${t.name}-${i}`} token={t} tableMeta={td} />;
           })}
         </div>
+      )}
+      {mapTokens.length > 0 && (
+        <Suspense fallback={null}>
+          {mapTokens.map((mt, i) => (
+            <ChatMap key={`map-${i}`} siteIds={mt.siteIds} />
+          ))}
+        </Suspense>
       )}
     </div>
   );

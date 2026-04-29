@@ -4,6 +4,7 @@ import AqiInfo from "./pages/AqiInfo";
 import Dashboard from "./pages/Dashboard";
 import Anomaly from "./pages/Anomaly";
 import Chat from "./pages/Chat";
+import SitePage from "./pages/SitePage";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { Toaster } from "sonner";
@@ -22,6 +23,7 @@ function App() {
           <Route path="/raw-data" element={<Dashboard />} />
           <Route path="/anomaly" element={<Anomaly />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/sites/:siteId" element={<SitePage />} />
         </Routes>
       </main>
       {!isChat && <Footer />}

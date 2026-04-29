@@ -565,7 +565,7 @@ function ChatBody({
 
   if (transcriptLoading) {
     return (
-      <div className="flex-1 p-6 space-y-4 max-w-3xl mx-auto w-full">
+      <div className="flex-1 p-6 space-y-4 max-w-5xl mx-auto w-full">
         <Skeleton className="h-20 w-full" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-20 w-2/3" />
@@ -578,7 +578,7 @@ function ChatBody({
   return (
     <>
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-6 space-y-6">
+        <div className="max-w-5xl mx-auto w-full px-4 md:px-6 py-6 space-y-6">
           {showWelcome ? (
             <Welcome onPrompt={onSend} sessionExists={!!currentId} onNew={onNew} />
           ) : (
@@ -661,7 +661,7 @@ function ChatRow({ message, streaming }) {
           className={cn(
             "rounded-lg",
             isUser
-              ? "bg-primary/15 text-foreground px-4 py-2.5 max-w-[80%]"
+              ? "bg-primary/15 text-foreground px-4 py-2.5 max-w-[60%]"
               : "bg-card border border-border px-4 py-3 w-full",
           )}
         >
@@ -724,7 +724,7 @@ function Composer({ onSend, disabled }) {
       onSubmit={submit}
       className="border-t border-border bg-card/50 backdrop-blur"
     >
-      <div className="max-w-3xl mx-auto w-full p-3 md:p-4">
+      <div className="max-w-5xl mx-auto w-full p-3 md:p-4">
         <div className="flex gap-2 items-end rounded-xl border border-border bg-background focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all px-3 py-2">
           <Textarea
             ref={taRef}

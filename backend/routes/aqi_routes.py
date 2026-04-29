@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from config import SITES_DATA
 from db import KOLKATA_SITES, get_engine
+from aqi_agent.sites import find_neighbours, get_site
 
 router = APIRouter()
 
@@ -161,4 +162,20 @@ def get_aqi_sites():
             {"site_id": sid, **SITES_DATA.get(sid, {})}
             for sid in KOLKATA_SITES
         ],
+    }
+
+
+@router.get("/site/{site_id}")
+def get_site_detail(site_id: str, neighbours_limit: int = 8):
+    """Site metadata + nearest neighbours. Powers the /sites/:id frontend page."""
+    info = get_site(site_id)
+    if info is None:
+        raise HTTPException(status_code=404, detail=f"unknown site {site_id!r}")
+    return {
+        "site_id": info["id"],
+        "name": info["name"],
+        "city": info.get("city"),
+        "lat": info["lat"],
+        "lon": info["lon"],
+        "neighbours": find_neighbours(site_id, neighbours_limit),
     }

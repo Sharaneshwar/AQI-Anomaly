@@ -41,6 +41,11 @@ from aqi_agent.events import (
 )
 from aqi_agent.observability import setup_observability
 from aqi_agent.retry import call_with_retry
+from aqi_agent.sites import (
+    all_cities as _all_cities,
+    find_neighbours as _find_neighbours,
+    list_city_sites as _list_city_sites,
+)
 from aqi_agent.tables import TableStore
 from aqi_agent.tools import aqicn, web_search as ws
 
@@ -412,6 +417,87 @@ class AQIAgent:
                     chart_hint="doughnut",
                 )
             return await _run_bounded_tool("get_anomaly_summary", _work)
+
+        # ---- Site-metadata tools (no DB; backed by sites.json + nearby_sites.pkl) ----
+        @agent.tool
+        async def list_city_sites(
+            ctx: RunContext[AQIDeps],
+            city: str,
+        ) -> dict:
+            """All monitoring sites in a city. Use this BEFORE a multi-site
+            DB tool (compare_sites, get_average, ...) to discover the deviceids.
+            Returns the FULL list — no preview truncation — so you can
+            see every site_id for the MAP token.
+
+            Args:
+                city: case-insensitive city name. Supported: Delhi, Mumbai,
+                    Hyderabad, Bengaluru, Kolkata.
+            """
+            async def _work() -> dict:
+                rows = _list_city_sites(city)
+                return _preview(
+                    ctx.deps.tables, f"sites_{city.lower()}", rows,
+                    preview_n=len(rows),
+                    chart_hint="table",
+                )
+            return await _run_bounded_tool("list_city_sites", _work)
+
+        @agent.tool
+        async def find_neighbours(
+            ctx: RunContext[AQIDeps],
+            site_id: str,
+        ) -> dict:
+            """Every pre-computed haversine neighbour of `site_id` (no
+            truncation). Returns site_id, name, city, lat, lon, distance_km.
+            The full list goes to you in the tool result so you can include
+            every neighbour in your MAP token if you choose.
+
+            Args:
+                site_id: e.g. 'site_5129'.
+            """
+            async def _work() -> dict:
+                rows = _find_neighbours(site_id)
+                return _preview(
+                    ctx.deps.tables, f"neighbours_{site_id}", rows,
+                    preview_n=len(rows),
+                    chart_hint="table",
+                )
+            return await _run_bounded_tool("find_neighbours", _work)
+
+        @agent.tool
+        async def compare_city_sites(
+            ctx: RunContext[AQIDeps],
+            city: str,
+            pollutant: Pollutant,
+            start: datetime,
+            end: datetime,
+            include_anomalies: bool = False,
+        ) -> dict:
+            """Run compare_sites across EVERY monitoring site in a city.
+            Wraps list_city_sites + compare_sites in one call so the LLM
+            doesn't have to chain. Default chart is grouped_bar.
+
+            Args:
+                city: case-insensitive city name.
+                pollutant: 'pm25' or 'pm10'.
+                start, end: inclusive bounds on dt_time.
+                include_anomalies: also include anomaly_count per site.
+            """
+            async def _work() -> dict:
+                site_rows = _list_city_sites(city)
+                site_ids = [r["site_id"] for r in site_rows]
+                if not site_ids:
+                    return {"error": f"no sites found for city {city!r}", "table": None}
+                rows = await ctx.deps.db.compare_sites(
+                    pollutant, site_ids, start, end, include_anomalies,
+                )
+                return _preview(
+                    ctx.deps.tables,
+                    f"compare_{city.lower()}_{pollutant}",
+                    rows,
+                    chart_hint="grouped_bar",
+                )
+            return await _run_bounded_tool("compare_city_sites", _work)
 
         if get_aqicn_token():
 
