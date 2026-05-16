@@ -44,8 +44,13 @@ class Database:
             min_size=2,
             max_size=20,
             ssl="require",
-            # Session-mode pooler (port 5432) supports prepared statements,
-            # so we leave the asyncpg statement cache at its default (100).
+            # Required for Supavisor's transaction-mode pooler (port 6543):
+            # prepared statements aren't preserved across statements there,
+            # so caching them gives DuplicatePreparedStatementError. Setting
+            # to 0 is safe on session-mode too (perf cost is negligible
+            # at our query volumes), so leave it on regardless of which DSN
+            # is in use.
+            statement_cache_size=0,
             command_timeout=45,
             # Recycle idle connections before the pooler's idle timeout so
             # we don't hand out a half-dead connection to a tool call.

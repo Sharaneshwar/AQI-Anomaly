@@ -45,12 +45,25 @@ const SEVERITY_COLOR = {
 };
 
 const RANGE_OPTIONS = [
-  { id: "24h", label: "Last 24h", limit: 96 },
-  { id: "7d", label: "Last 7 days", limit: 672 },
-  { id: "30d", label: "Last 30 days", limit: 2880 },
-  { id: "all", label: "All recent", limit: 10000 },
+  { id: "24h", label: "Last 24h",     limit: 96,    hours: 24 },
+  { id: "7d",  label: "Last 7 days",  limit: 672,   hours: 24 * 7 },
+  { id: "30d", label: "Last 30 days", limit: 2880,  hours: 24 * 30 },
+  { id: "all", label: "All recent",   limit: 10000, hours: null },
 ];
 
+// Range-aware tick formatter: short labels for short windows.
+const tickFormatterFor = (rangeId) => (t) => {
+  const d = new Date(t);
+  if (rangeId === "24h") {
+    return d.toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  }
+  if (rangeId === "7d") {
+    return d.toLocaleString("en-IN", { weekday: "short", hour: "2-digit", hour12: false });
+  }
+  return d.toLocaleString("en-IN", { month: "short", day: "numeric" });
+};
+
+// Tooltip header always shows full date+time regardless of range.
 const formatTime = (iso) => {
   if (!iso) return "";
   const d = new Date(iso);
@@ -62,6 +75,16 @@ const formatTime = (iso) => {
     hour12: false,
   });
 };
+
+// Y-axis bounds that include every spike (anomalies are the point of this
+// chart) with ~8 % padding above the max so dots aren't flush with the
+// border. Lower bound is always 0 — PM concentrations don't go negative.
+function yDomainFromBaseline(values) {
+  const clean = values.filter((v) => Number.isFinite(v));
+  if (!clean.length) return [0, 100];
+  const max = Math.max(...clean);
+  return [0, Math.ceil(max * 1.08)];
+}
 
 function StatCard({ icon: Icon, label, value, hint, accent }) {
   return (
@@ -186,17 +209,54 @@ export default function Anomaly() {
     }));
   }, [data]);
 
+  // Trim the API response to the actual time window for the chosen range,
+  // anchored at the most recent timestamp we received. This is what makes
+  // the X-axis visually reflect "Last 24h" vs "Last 30 days" — without
+  // it the chart silently shows whatever window the limit happened to
+  // cover.
+  const windowed = useMemo(() => {
+    if (!series.length) return [];
+    const opt = RANGE_OPTIONS.find((r) => r.id === range) ?? RANGE_OPTIONS[1];
+    if (opt.hours == null) return series; // "all"
+    const lastTs = series[series.length - 1].ts;
+    const cutoff = lastTs - opt.hours * 3600 * 1000;
+    return series.filter((r) => r.ts >= cutoff);
+  }, [series, range]);
+
+  const xDomain = useMemo(() => {
+    if (!windowed.length) return [0, 1];
+    return [windowed[0].ts, windowed[windowed.length - 1].ts];
+  }, [windowed]);
+
+  // 6 evenly spaced ticks across the domain — keeps X labels uncluttered
+  // regardless of point density.
+  const xTicks = useMemo(() => {
+    if (windowed.length < 2) return undefined;
+    const [a, b] = xDomain;
+    const N = 6;
+    return Array.from({ length: N }, (_, i) => a + ((b - a) * i) / (N - 1));
+  }, [windowed, xDomain]);
+
+  const yDomain = useMemo(() => {
+    const vals = [];
+    for (const r of windowed) {
+      if (r.pm25 != null) vals.push(r.pm25);
+      if (r.pm10 != null) vals.push(r.pm10);
+    }
+    return yDomainFromBaseline(vals);
+  }, [windowed]);
+
   const stats = useMemo(() => {
-    if (!series.length) return null;
-    const pm25 = series.filter((r) => r.pm25 != null);
-    const pm10 = series.filter((r) => r.pm10 != null);
+    if (!windowed.length) return null;
+    const pm25 = windowed.filter((r) => r.pm25 != null);
+    const pm10 = windowed.filter((r) => r.pm10 != null);
     const pm25Anom = pm25.filter((r) => r.pm25Anomaly).length;
     const pm10Anom = pm10.filter((r) => r.pm10Anomaly).length;
     const avg = (xs) =>
       xs.length ? (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1) : "—";
     const max = (xs) => (xs.length ? Math.max(...xs).toFixed(0) : "—");
     return {
-      total: series.length,
+      total: windowed.length,
       pm25Anom,
       pm10Anom,
       avgPM25: avg(pm25.map((r) => r.pm25)),
@@ -207,21 +267,21 @@ export default function Anomaly() {
         ? `${((pm25Anom / pm25.length) * 100).toFixed(1)}%`
         : "—",
     };
-  }, [series]);
+  }, [windowed]);
 
   const pm25AnomalyPoints = useMemo(
     () =>
-      series
+      windowed
         .filter((r) => r.pm25Anomaly && r.pm25 != null)
         .map((r) => ({ ts: r.ts, value: r.pm25 })),
-    [series],
+    [windowed],
   );
   const pm10AnomalyPoints = useMemo(
     () =>
-      series
+      windowed
         .filter((r) => r.pm10Anomaly && r.pm10 != null)
         .map((r) => ({ ts: r.ts, value: r.pm10 })),
-    [series],
+    [windowed],
   );
 
   const anomalyEvents = useMemo(() => {
@@ -369,7 +429,7 @@ export default function Anomaly() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
-                  data={series}
+                  data={windowed}
                   margin={{ top: 5, right: 12, left: -12, bottom: 0 }}
                 >
                   <defs>
@@ -386,13 +446,19 @@ export default function Anomaly() {
                   <XAxis
                     dataKey="ts"
                     type="number"
-                    domain={["dataMin", "dataMax"]}
-                    tickFormatter={(t) => formatTime(new Date(t).toISOString())}
+                    scale="time"
+                    domain={xDomain}
+                    ticks={xTicks}
+                    tickFormatter={tickFormatterFor(range)}
                     stroke="#94a3b8"
                     fontSize={11}
-                    minTickGap={70}
+                    minTickGap={50}
                   />
-                  <YAxis stroke="#94a3b8" fontSize={11} />
+                  <YAxis
+                    domain={yDomain}
+                    stroke="#94a3b8"
+                    fontSize={11}
+                  />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend
                     iconType="circle"

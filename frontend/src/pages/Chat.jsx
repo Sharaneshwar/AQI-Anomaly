@@ -84,6 +84,9 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [streaming, setStreaming] = useState(false);
   const [transcriptLoading, setTranscriptLoading] = useState(false);
+  // Desktop sidebar visibility — collapsible via header toggle so the chat
+  // gets full width when the user wants to focus.
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const esRef = useRef(null);
   // SSE coalescer: text_delta fires per token. We buffer into a ref and
   // flush via requestAnimationFrame so React commits at ~60fps regardless
@@ -377,16 +380,37 @@ export default function Chat() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-72px)] bg-background text-foreground">
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
       <Toaster theme="dark" position="top-right" richColors />
 
-      <aside className="hidden md:flex md:w-72 lg:w-[300px] border-r border-border bg-sidebar/40 backdrop-blur">
-        {sidebar}
+      {/* Desktop sidebar — animates width via the toggle. Hidden entirely
+          when sidebarOpen is false so the chat takes full width. */}
+      <aside
+        className={cn(
+          "hidden md:flex border-r border-border bg-sidebar/40 backdrop-blur",
+          "transition-[width] duration-300 ease-out overflow-hidden",
+          sidebarOpen ? "md:w-72 lg:w-[300px]" : "md:w-0",
+        )}
+      >
+        <div className={cn("h-full w-72 lg:w-[300px] flex", !sidebarOpen && "pointer-events-none opacity-0")}>
+          {sidebar}
+        </div>
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">
         <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-card/60 backdrop-blur">
           <div className="flex items-center gap-2 min-w-0">
+            {/* Desktop: toggle sidebar inline. Mobile: open as Sheet. */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden md:inline-flex"
+              onClick={() => setSidebarOpen((v) => !v)}
+              aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+              title={sidebarOpen ? "Hide chats" : "Show chats"}
+            >
+              <PanelLeft className="h-5 w-5" />
+            </Button>
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="md:hidden">
@@ -750,9 +774,6 @@ function Composer({ onSend, disabled }) {
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground text-center">
-          Enter to send · Shift+Enter for newline
-        </p>
       </div>
     </form>
   );

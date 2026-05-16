@@ -4,6 +4,8 @@
 @import "@fontsource-variable/geist";
 @import "./pages/Dashboard.css";
 
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 /* TT Commons (with Geist Variable as fallback) */

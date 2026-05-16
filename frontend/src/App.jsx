@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import Home from "./pages/Home";
 import AqiInfo from "./pages/AqiInfo";
 import Dashboard from "./pages/Dashboard";
@@ -10,12 +10,12 @@ import Footer from "./components/Footer";
 import { Toaster } from "sonner";
 
 function App() {
-  const isChat = typeof window !== "undefined" && window.location.pathname === "/chat";
+  const isChat = useLocation().pathname.startsWith("/chat");
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <Toaster theme="dark" position="top-right" richColors />
-      <Navbar />
+      {!isChat && <Navbar />}
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
